@@ -1,0 +1,522 @@
+// import 'package:path/path.dart';
+// import 'package:sqflite/sqflite.dart';
+//
+// class DatabaseHelper {
+//   static final DatabaseHelper instance = DatabaseHelper._init();
+//   static Database? _database;
+//
+//   DatabaseHelper._init();
+//
+//   Future<Database> get database async {
+//     if (_database != null) return _database!;
+//     _database = await _initDB('medibook.db');
+//     return _database!;
+//   }
+//
+//   Future<Database> _initDB(String filePath) async {
+//     final dbPath = await getDatabasesPath();
+//     final path = join(dbPath, filePath);
+//
+//     return await openDatabase(
+//       path,
+//       version: 4, // Nâng lên version 4 để cập nhật cấu trúc bảng mới
+//       onCreate: _createDB,
+//       onUpgrade: (db, oldVersion, newVersion) async {
+//         // Hỗ trợ cập nhật từ các version cũ mà không làm mất tài khoản người dùng
+//         if (oldVersion < 3) {
+//           await db.execute('DROP TABLE IF EXISTS appointments');
+//           await db.execute('''
+//           CREATE TABLE appointments(
+//             id INTEGER PRIMARY KEY AUTOINCREMENT,
+//             userEmail TEXT,
+//             hospital TEXT,
+//             doctor TEXT,
+//             specialty TEXT,
+//             date TEXT,
+//             time TEXT,
+//             symptom TEXT
+//           )
+//           ''');
+//         }
+//
+//         // NÂNG CẤP LÊN VERSION 4: Thêm cột status và stt nếu đang ở các bản cũ hơn
+//         if (oldVersion < 4) {
+//           try {
+//             await db.execute("ALTER TABLE appointments ADD COLUMN status TEXT DEFAULT 'upcoming'");
+//             await db.execute("ALTER TABLE appointments ADD COLUMN stt INTEGER DEFAULT 0");
+//           } catch (e) {
+//             print("Lỗi nâng cấp hoặc cột đã tồn tại: $e");
+//           }
+//         }
+//       },
+//     );
+//   }
+//
+//   Future _createDB(Database db, int version) async {
+//     await db.execute('''
+//     CREATE TABLE users(
+//       id INTEGER PRIMARY KEY AUTOINCREMENT,
+//       name TEXT,
+//       email TEXT,
+//       password TEXT
+//     )
+//     ''');
+//
+//     // Tạo bảng với đầy đủ cột status và stt ngay từ đầu cho máy mới cài app
+//     await db.execute('''
+//     CREATE TABLE appointments(
+//       id INTEGER PRIMARY KEY AUTOINCREMENT,
+//       userEmail TEXT,
+//       hospital TEXT,
+//       doctor TEXT,
+//       specialty TEXT,
+//       date TEXT,
+//       time TEXT,
+//       symptom TEXT,
+//       status TEXT DEFAULT 'upcoming',
+//       stt INTEGER DEFAULT 0
+//     )
+//     ''');
+//   }
+//
+//   // ================= UPDATE USER PASSWORD =================
+//   Future<int> updateUserPassword(String email, String newPassword) async {
+//     final db = await database;
+//     return await db.update(
+//       'users',
+//       {'password': newPassword},
+//       where: 'email = ?',
+//       whereArgs: [email],
+//     );
+//   }
+//
+//   // ================= REGISTER =================
+//   Future<int> registerUser(String name, String email, String password) async {
+//     final db = await instance.database;
+//     return await db.insert(
+//       'users',
+//       {
+//         'name': name,
+//         'email': email,
+//         'password': password,
+//       },
+//     );
+//   }
+//
+//   // ================= LOGIN =================
+//   Future<bool> loginUser(String email, String password) async {
+//     final db = await database;
+//     final result = await db.query(
+//       'users',
+//       where: 'email = ? AND password = ?',
+//       whereArgs: [email, password],
+//     );
+//     return result.isNotEmpty;
+//   }
+//
+//   // ================= ADD APPOINTMENT =================
+//   Future<int> addAppointment({
+//     required String userEmail,
+//     required String hospital,
+//     required String doctor,
+//     required String specialty,
+//     required String date,
+//     required String time,
+//     required String symptoms,
+//     String status = 'upcoming',
+//     int stt = 0,
+//   }) async {
+//     final db = await database;
+//     return await db.insert(
+//       'appointments',
+//       {
+//         'userEmail': userEmail,
+//         'hospital': hospital,
+//         'doctor': doctor,
+//         'specialty': specialty,
+//         'date': date,
+//         'time': time,
+//         'symptom': symptoms,
+//         'status': status,
+//         'stt': stt,
+//       },
+//     );
+//   }
+//
+//   // ================= GET APPOINTMENTS ================
+//   Future<List<Map<String, dynamic>>> getAppointments(String userEmail) async {
+//     final db = await database;
+//     return await db.query(
+//       'appointments',
+//       where: 'userEmail = ?',
+//       whereArgs: [userEmail],
+//       orderBy: 'id DESC',
+//     );
+//   }
+//
+//   //====================================================
+//   Future<List<Map<String, dynamic>>> getAppointmentsByUser(String userEmail) async {
+//     final db = await database;
+//     return await db.query(
+//       'appointments',
+//       where: 'userEmail = ?',
+//       whereArgs: [userEmail],
+//       orderBy: 'id DESC',
+//     );
+//   }
+//
+//   // ================= DELETE =================
+//   Future<int> deleteAppointment(int id) async {
+//     final db = await database;
+//     return await db.delete(
+//       'appointments',
+//       where: 'id = ?',
+//       whereArgs: [id],
+//     );
+//   }
+//
+//   // ================= CHECK DUPLICATE =================
+//   Future<bool> isAppointmentDuplicate(String email, String date, String time) async {
+//     final db = await database;
+//     final result = await db.query(
+//       'appointments',
+//       where: 'userEmail = ? AND date = ? AND time = ?',
+//       whereArgs: [email, date, time],
+//     );
+//     return result.isNotEmpty;
+//   }
+//
+//   // ================= CHECK EMAIL =================
+//   Future<bool> checkEmailExists(String email) async {
+//     final db = await database;
+//     final result = await db.query(
+//       'users',
+//       where: 'email = ?',
+//       whereArgs: [email],
+//     );
+//     return result.isNotEmpty;
+//   }
+//
+//   // ================= DELETE USER =================
+//   Future<int> deleteUserByEmail(String email) async {
+//     final db = await database;
+//     return await db.delete(
+//       'users',
+//       where: 'email = ?',
+//       whereArgs: [email],
+//     );
+//   }
+//
+//   // ================= UPDATE APPOINTMENT TIME =================
+//   Future<int> updateAppointmentTime(int id, String date, String time) async {
+//     final db = await database;
+//     return await db.update(
+//       'appointments',
+//       {
+//         'date': date,
+//         'time': time,
+//       },
+//       where: 'id = ?',
+//       whereArgs: [id],
+//     );
+//   }
+//
+//   // ================= ĐỊNH NGHĨA HÀM UPDATE STATUS (FIX LỖI CỦA BẠN) =================
+//   Future<int> updateAppointmentStatus(int id, String newStatus) async {
+//     final db = await database;
+//     return await db.update(
+//       'appointments',
+//       {
+//         'status': newStatus,
+//       },
+//       where: 'id = ?',
+//       whereArgs: [id],
+//     );
+//   }
+//
+//   // ================= GET USER =================
+//   Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+//     final db = await database;
+//     final result = await db.query(
+//       'users',
+//       where: 'email = ?',
+//       whereArgs: [email],
+//     );
+//     if (result.isNotEmpty) {
+//       return result.first;
+//     }
+//     return null;
+//   }
+// }
+
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+class DatabaseHelper {
+  static final DatabaseHelper instance = DatabaseHelper._init();
+  static Database? _database;
+
+  DatabaseHelper._init();
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB('medibook.db');
+    return _database!;
+  }
+
+  Future<Database> _initDB(String filePath) async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+
+    return await openDatabase(
+      path,
+      version: 1, // Reset về version 1 sạch sẽ
+      onCreate: _createDB,
+    );
+  }
+
+  Future _createDB(Database db, int version) async {
+    // 1. Tạo bảng users sạch từ đầu
+    await db.execute('''
+    CREATE TABLE users(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      email TEXT,
+      password TEXT
+    )
+    ''');
+
+    // 2. Tạo bảng appointments tích hợp đầy đủ cột room, status và stt sạch từ đầu
+    await db.execute('''
+    CREATE TABLE appointments(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userEmail TEXT,
+      hospital TEXT,
+      doctor TEXT,
+      specialty TEXT,
+      room TEXT,          -- Bổ sung trường số phòng
+      date TEXT,
+      time TEXT,
+      symptom TEXT,
+      status TEXT DEFAULT 'upcoming',
+      stt INTEGER DEFAULT 0
+    )
+    ''');
+  }
+
+  // ================= UPDATE USER PASSWORD =================
+  Future<int> updateUserPassword(String email, String newPassword) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'password': newPassword},
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+  }
+
+  // ================= REGISTER =================
+  Future<int> registerUser(String name, String email, String password) async {
+    final db = await instance.database;
+    return await db.insert(
+      'users',
+      {
+        'name': name,
+        'email': email,
+        'password': password,
+      },
+    );
+  }
+
+  // ================= LOGIN =================
+  Future<bool> loginUser(String email, String password) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'email = ? AND password = ?',
+      whereArgs: [email, password],
+    );
+    return result.isNotEmpty;
+  }
+
+  // ================= ADD APPOINTMENT =================
+  Future<int> addAppointment({
+    required String userEmail,
+    required String hospital,
+    required String doctor,
+    required String specialty,
+    required String room, // Bổ sung tham số bắt buộc room
+    required String date,
+    required String time,
+    required String symptoms,
+    String status = 'upcoming',
+    int stt = 0,
+  }) async {
+    final db = await database;
+    return await db.insert(
+      'appointments',
+      {
+        'userEmail': userEmail,
+        'hospital': hospital,
+        'doctor': doctor,
+        'specialty': specialty,
+        'room': room, // Đưa room vào cơ sở dữ liệu
+        'date': date,
+        'time': time,
+        'symptom': symptoms,
+        'status': status,
+        'stt': stt,
+      },
+    );
+  }
+
+  // ================= GET APPOINTMENTS ================
+  Future<List<Map<String, dynamic>>> getAppointments(String userEmail) async {
+    final db = await database;
+    return await db.query(
+      'appointments',
+      where: 'userEmail = ?',
+      whereArgs: [userEmail],
+      orderBy: 'id DESC',
+    );
+  }
+
+  //====================================================
+  Future<List<Map<String, dynamic>>> getAppointmentsByUser(String userEmail) async {
+    final db = await database;
+    return await db.query(
+      'appointments',
+      where: 'userEmail = ?',
+      whereArgs: [userEmail],
+      orderBy: 'id DESC',
+    );
+  }
+
+  // ================= DELETE =================
+  Future<int> deleteAppointment(int id) async {
+    final db = await database;
+    return await db.delete(
+      'appointments',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+// ================= CHECK DUPLICATE (CHỈ CHẶN NẾU LỊCH ĐANG UPCOMING) =================
+  Future<bool> isAppointmentDuplicate(
+      String email,
+      String date,
+      String time,
+      ) async {
+    final db = await database;
+    final result = await db.query(
+      'appointments',
+      where: 'userEmail = ? AND date = ? AND time = ? AND status = ?',
+      whereArgs: [
+        email,
+        date,
+        time,
+        'upcoming', // Chỉ những lịch hẹn sắp diễn ra mới tính là trùng
+      ],
+    );
+
+    return result.isNotEmpty;
+  }
+
+  // ================= CHECK EMAIL =================
+  Future<bool> checkEmailExists(String email) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    return result.isNotEmpty;
+  }
+
+  // ================= DELETE USER =================
+  Future<int> deleteUserByEmail(String email) async {
+    final db = await database;
+    return await db.delete(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+  }
+
+  // ================= UPDATE APPOINTMENT TIME =================
+  // Future<int> updateAppointmentTime(int id, String date, String time) async {
+  //   final db = await database;
+  //   return await db.update(
+  //     'appointments',
+  //     {
+  //       'date': date,
+  //       'time': time,
+  //     },
+  //     where: 'id = ?',
+  //     whereArgs: [id],
+  //   );
+  // }
+  //
+  // // ================= UPDATE STATUS =================
+  // Future<int> updateAppointmentStatus(int id, String newStatus) async {
+  //   final db = await database;
+  //   return await db.update(
+  //     'appointments',
+  //     {
+  //       'status': newStatus,
+  //       'stt': 0,
+  //     },
+  //     where: 'id = ?',
+  //     whereArgs: [id],
+  //   );
+  // }
+  // ================= CẬP NHẬT NGÀY GIỜ VÀ STT MỚI SẠCH SẼ =================
+  Future<int> updateAppointmentTime(dynamic id, String date, String time, int stt) async {
+    final db = await database;
+    // Chuyển đổi id an toàn, nếu là chuỗi (String từ Firebase id) thì không cập nhật theo cột ID số nguyên của SQLite
+    if (id is int) {
+      return await db.update(
+        'appointments',
+        {
+          'date': date,
+          'time': time,
+          'stt': stt,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    return 0;
+  }
+
+  // ================= CẬP NHẬT TRẠNG THÁI VÀ RESET STT VỀ 0 =================
+  Future<int> updateAppointmentStatus(dynamic id, String newStatus) async {
+    final db = await database;
+    if (id is int) {
+      return await db.update(
+        'appointments',
+        {
+          'status': newStatus,
+          'stt': 0,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    return 0;
+  }
+
+  // ================= GET USER =================
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null;
+  }
+}
