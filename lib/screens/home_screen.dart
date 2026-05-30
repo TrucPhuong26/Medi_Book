@@ -251,10 +251,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: filteredDoctors.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount, // Tự động thay đổi từ 2 -> 5 cột tùy máy
+                        crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        childAspectRatio: 0.65, // Điều chỉnh tỉ lệ hộp Card cân đối hơn
+                        // === ĐÃ ĐIỀU CHỈNH: Tăng tỷ lệ lên 0.68 để thu ngắn chiều dài Card lại giúp bố cục vuông vắn hơn ===
+                        childAspectRatio: 0.68,
                       ),
                       itemBuilder: (context, index) {
                         final doctor = filteredDoctors[index];
@@ -270,14 +271,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   price: doctor['price'],
                                   description: doctor['description'],
                                   hospital: doctor['hospital'],
-                                  room: doctor['room'], // Thêm dòng này để truyền dữ liệu sang
+                                  room: doctor['room'],
                                 ),
                               ),
                             );
                           },
                           child: Card(
                             elevation: 4,
-                            color: cardBgColor, // Hỗ trợ đổi nền khi đổi chế độ sáng/tối
+                            color: cardBgColor,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
@@ -287,33 +288,85 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        const CircleAvatar(radius: 35, backgroundColor: Color(0xffe3f2fd), child: Icon(Icons.person, size: 35, color: Colors.blue)),
+                                        const CircleAvatar(
+                                            radius: 32,
+                                            backgroundColor: Color(0xffe3f2fd),
+                                            child: Icon(Icons.person, size: 32, color: Colors.blue)
+                                        ),
                                         const SizedBox(height: 8),
-                                        Text(doctor['name'], textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: dropdownTextColor)),
+
+                                        // Tên bác sĩ
+                                        Text(
+                                            doctor['name'],
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: dropdownTextColor)
+                                        ),
                                         const SizedBox(height: 4),
-                                        Text(doctor['specialty'], style: const TextStyle(color: Colors.blue, fontSize: 13, fontWeight: FontWeight.w500)),
+
+                                        // Chuyên khoa
+                                        Text(
+                                            doctor['specialty'],
+                                            style: const TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.w500)
+                                        ),
                                         const SizedBox(height: 2),
-                                        Text(doctor['hospital'], textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                        const SizedBox(height: 2),
-                                        Text(doctor['experience'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                        const SizedBox(height: 4),
+
+                                        // Bệnh viện
+                                        Flexible(
+                                          child: Text(
+                                              doctor['hospital'],
+                                              textAlign: TextAlign.center,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(color: Colors.grey, fontSize: 11)
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+
+                                        // === THIẾT KẾ MỚI: Gộp Kinh nghiệm & Đánh giá trên cùng một hàng ngang ===
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment: MainAxisAlignment.center, // Đẩy kinh nghiệm gan nhau rating o giua
                                           children: [
-                                            const Icon(Icons.star, color: Colors.orange, size: 16),
-                                            const SizedBox(width: 4),
-                                            Text(doctor['rating'], style: TextStyle(color: dropdownTextColor, fontSize: 12)),
+                                            // Bên trái: Số năm kinh nghiệm (Bọc Expanded/Flexible phòng hờ chữ to)
+                                            Flexible(
+                                              child: Text(
+                                                  doctor['experience'], // Ví dụ: "10 năm"
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)
+                                              ),
+                                            ),
+                              const SizedBox(width: 12),
+                                            // Bên phải: Đánh giá sao (Ví dụ: [icon] 4.9)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.star, color: Colors.orange, size: 13),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                    doctor['rating'],
+                                                    style: TextStyle(color: dropdownTextColor, fontSize: 11, fontWeight: FontWeight.bold)
+                                                ),
+                                              ],
+                                            ),
                                           ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 3),
+
+                                  // Nút Đặt lịch
                                   SizedBox(
                                     width: double.infinity,
-                                    height: 38,
+                                    height: 36,
                                     child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.blue,
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                                      ),
                                       onPressed: () {
                                         Navigator.push(
                                           context,
@@ -335,7 +388,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         );
                       },
-                    ),
+                    )
+
                   ],
                 ),
               ),

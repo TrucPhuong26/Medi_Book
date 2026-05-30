@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:io';
+
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
   @override
@@ -194,501 +195,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     }
     await _scheduleAllAppointmentNotifications();
   }
-// ================= CẬP NHẬT TRẠNG THÁI LỊCH HẸN (ĐÃ TỐI ƯU OFFLINE) =================
-//   Future<void> _updateAppointmentStatus(
-//       dynamic sqliteId,
-//       String? firebaseId,
-//       String newStatus,
-//       String successMsg,
-//       Map<String, dynamic> appointmentItem,
-//       ) async {
-//     try {
-//       // 1. XỬ LÝ TRÊN FIREBASE
-//       if (firebaseId != null && firebaseId.isNotEmpty) {
-//         String hospital = safe(appointmentItem, 'hospital');
-//         String specialty = safe(appointmentItem, 'specialty');
-//         String date = safe(appointmentItem, 'date');
-//         String time = safe(appointmentItem, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
-//
-//         int myStt = appointmentItem['stt'] is int
-//             ? appointmentItem['stt']
-//             : int.tryParse(safe(appointmentItem, 'stt')) ?? 0;
-//
-//         // Cập nhật trạng thái của chính mình
-//         await FirebaseFirestore.instance
-//             .collection('appointments')
-//             .doc(firebaseId)
-//             .update({'status': newStatus});
-//
-//         // CHỈ ĐÔN DỊCH HÀNG ĐỢI KHI HÀM ĐƯỢC GỌI LÀ HỦY LỊCH ('cancelled')
-//         if (newStatus == 'cancelled') {
-//           final queueSnapshot = await FirebaseFirestore.instance
-//               .collection('appointments')
-//               .where('hospital', isEqualTo: hospital)
-//               .where('specialty', isEqualTo: specialty)
-//               .where('date', isEqualTo: date)
-//               .where('time', isEqualTo: time)
-//               .get();
-//
-//           List<Future<void>> clearQueueFutures = [];
-//           for (var doc in queueSnapshot.docs) {
-//             if (doc.id == firebaseId) continue;
-//
-//             String status = (doc.data()['status'] ?? 'upcoming').toString();
-//             if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
-//               continue;
-//             }
-//
-//             int currentStt = doc.data()['stt'] ?? 0;
-//             // Những người có STT lớn hơn người hủy thì mới giảm đi 1
-//             if (currentStt > myStt) {
-//               clearQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
-//             }
-//           }
-//
-//           if (clearQueueFutures.isNotEmpty) {
-//             await Future.wait(clearQueueFutures);
-//           }
-//         }
-//       }
-//
-//       // 2. XỬ LÝ ĐỒNG BỘ TRÊN SQLITE LOCAL
-//       try {
-//         final db = await DatabaseHelper.instance.database;
-//         if (sqliteId != null && sqliteId is int) {
-//           await DatabaseHelper.instance.updateAppointmentStatus(sqliteId, newStatus);
-//         } else {
-//           String dateStr = safe(appointmentItem, 'date');
-//           String timeStr = safe(appointmentItem, 'time');
-//           String emailStr = safe(appointmentItem, 'userEmail').isEmpty
-//               ? LoginScreen.loggedInEmail
-//               : safe(appointmentItem, 'userEmail');
-//
-//           await db.update(
-//             'appointments',
-//             {'status': newStatus},
-//             where: 'userEmail = ? AND date = ? AND time = ?',
-//             whereArgs: [emailStr, dateStr, timeStr],
-//           );
-//         }
-//       } catch (ex) {
-//         print("SQLite update lỗi: $ex");
-//       }
-//
-//       // 3. REFRESH LẠI TOÀN BỘ DATA ĐỂ ĐỒNG BỘ LÊN MÀN HÌNH
-//       await loadAppointments();
-//
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           backgroundColor: Colors.green,
-//           content: Text(successMsg),
-//         ),
-//       );
-//     } catch (e) {
-//       print("Lỗi cập nhật trạng thái: $e");
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Không thể xử lý yêu cầu')),
-//         );
-//       }
-//     }
-//   }
-//
-// // ================= XỬ LÝ HỦY LỊCH HẸN =================
-//   Future<void> deleteAppointment(dynamic sqliteId, String? firebaseId, Map<String, dynamic> item) async {
-//     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-//     final confirm = await showDialog<bool>(
-//       context: context,
-//       builder: (context) {
-//         return AlertDialog(
-//           backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
-//           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//           title: Text('Hủy lịch hẹn', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-//           content: Text('Bạn có chắc muốn hủy lịch này?', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87)),
-//           actions: [
-//             TextButton(
-//               onPressed: () => Navigator.pop(context, false),
-//               child: const Text('Không'),
-//             ),
-//             ElevatedButton(
-//               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-//               onPressed: () => Navigator.pop(context, true),
-//               child: const Text('Có', style: TextStyle(color: Colors.white)),
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//
-//     if (confirm == true) {
-//       final int notificationId = sqliteId is int ? sqliteId : (firebaseId ?? '').hashCode;
-//       await flutterLocalNotificationsPlugin.cancel(notificationId);
-//       await _updateAppointmentStatus(sqliteId, firebaseId, 'cancelled', 'Đã hủy lịch hẹn thành công', item);
-//     }
-//   }
-//
-// // ================= XỬ LÝ ẨN KHỎI LỊCH SỬ =================
-//   Future<void> archiveHistoryItem(dynamic sqliteId, String? firebaseId, Map<String, dynamic> item) async {
-//     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-//     final confirm = await showDialog<bool>(
-//       context: context,
-//       builder: (context) {
-//         return AlertDialog(
-//           backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
-//           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//           title: Text('Ẩn lịch sử', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-//           content: Text('Bạn muốn ẩn lịch hẹn cũ này khỏi giao diện hiển thị?', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87)),
-//           actions: [
-//             TextButton(
-//               onPressed: () => Navigator.pop(context, false),
-//               child: const Text('Không'),
-//             ),
-//             ElevatedButton(
-//               style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade700),
-//               onPressed: () => Navigator.pop(context, true),
-//               child: const Text('Ẩn đi', style: TextStyle(color: Colors.white)),
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//
-//     if (confirm == true) {
-//       await _updateAppointmentStatus(sqliteId, firebaseId, 'archived', 'Đã ẩn lịch hẹn khỏi danh sách hiển thị', item);
-//     }
-//   }
-//
-//   bool _isTimePast(DateTime selectedDate, String timeStr) {
-//     final now = DateTime.now();
-//     if (selectedDate.year > now.year) return false;
-//     if (selectedDate.year == now.year && selectedDate.month > now.month) return false;
-//     if (selectedDate.year == now.year && selectedDate.month == now.month && selectedDate.day > now.day) return false;
-//     if (selectedDate.year == now.year && selectedDate.month == now.month && selectedDate.day < now.day) return true;
-//     try {
-//       String cleanTime = timeStr;
-//       bool isPM = cleanTime.contains('CH');
-//       cleanTime = cleanTime.replaceAll('SA', '').replaceAll('CH', '').trim();
-//       List<String> parts = cleanTime.split(':');
-//       int hour = int.parse(parts[0]);
-//       int minute = int.parse(parts[1]);
-//       if (isPM && hour < 12) hour += 12;
-//       if (!isPM && hour == 12) hour = 0;
-//       if (hour < now.hour) return true;
-//       if (hour == now.hour && minute <= now.minute) return true;
-//     } catch (e) {
-//       print("Lỗi phân tích cú pháp thời gian: $e");
-//     }
-//     return false;
-//   }
-//
-//   Future<void> editAppointment(dynamic sqliteId, String? firebaseId, String currentDate, String currentTime, Map<String, dynamic> fullAppointment) async {
-//     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-//     DateTime selectedDate = DateTime.tryParse(currentDate) ?? DateTime.now();
-//     if (selectedDate.isBefore(DateTime.now())) selectedDate = DateTime.now();
-//     String selectedTime = currentTime.trim();
-//     if (!availableTimes.contains(selectedTime)) {
-//       selectedTime = availableTimes.first;
-//     }
-//     await showDialog(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (context) {
-//         return StatefulBuilder(
-//           builder: (context, setPopupState) {
-//             String dateDisplay = "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-//             return AlertDialog(
-//               backgroundColor: isDarkMode ? const Color(0xff2A2A2A) : Colors.white,
-//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//               title: Row(
-//                 children: [
-//                   const Icon(Icons.edit_calendar, color: Colors.blue),
-//                   const SizedBox(width: 8),
-//                   Text(
-//                     'Thay đổi lịch khám',
-//                     style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
-//                   ),
-//                 ],
-//               ),
-//               content: SingleChildScrollView(
-//                 child: Column(
-//                   mainAxisSize: MainAxisSize.min,
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     const Text('1. Chọn ngày khám mới:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-//                     const SizedBox(height: 8),
-//                     InkWell(
-//                       onTap: () async {
-//                         final DateTime? picked = await showDatePicker(
-//                           context: context,
-//                           initialDate: selectedDate,
-//                           firstDate: DateTime.now(),
-//                           lastDate: DateTime.now().add(const Duration(days: 365)),
-//                         );
-//                         if (picked != null) {
-//                           setPopupState(() {
-//                             selectedDate = picked;
-//                           });
-//                         }
-//                       },
-//                       child: Container(
-//                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//                         decoration: BoxDecoration(
-//                           border: Border.all(color: Colors.blue),
-//                           borderRadius: BorderRadius.circular(8),
-//                           color: isDarkMode ? Colors.white10 : Colors.blue.withOpacity(0.05),
-//                         ),
-//                         child: Row(
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                           children: [
-//                             Text(dateDisplay, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 15)),
-//                             const Icon(Icons.calendar_month, color: Colors.blue),
-//                           ],
-//                         ),
-//                       ),
-//                     ),
-//                     const SizedBox(height: 18),
-//                     const Text('2. Chọn khung giờ mới:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-//                     const SizedBox(height: 8),
-//                     Wrap(
-//                       spacing: 8,
-//                       runSpacing: 8,
-//                       children: availableTimes.map((time) {
-//                         bool isSelected = selectedTime == time;
-//                         bool isPast = _isTimePast(selectedDate, time);
-//                         return InkWell(
-//                           onTap: isPast
-//                               ? null
-//                               : () {
-//                             setPopupState(() {
-//                               selectedTime = time;
-//                             });
-//                           },
-//                           child: Container(
-//                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-//                             decoration: BoxDecoration(
-//                               color: isPast
-//                                   ? (isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey[100])
-//                                   : (isSelected ? Colors.blue : (isDarkMode ? Colors.white10 : Colors.grey[200])),
-//                               borderRadius: BorderRadius.circular(8),
-//                               border: Border.all(
-//                                 color: isPast
-//                                     ? (isDarkMode ? Colors.white12 : Colors.grey[300]!)
-//                                     : (isSelected ? Colors.blue : (isDarkMode ? Colors.white24 : Colors.grey[300]!)),
-//                               ),
-//                             ),
-//                             child: Text(
-//                               time,
-//                               style: TextStyle(
-//                                 color: isPast
-//                                     ? (isDarkMode ? Colors.white30 : Colors.grey[400])
-//                                     : (isSelected ? Colors.white : (isDarkMode ? Colors.white70 : Colors.black87)),
-//                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-//                                 decoration: isPast ? TextDecoration.lineThrough : TextDecoration.none,
-//                               ),
-//                             ),
-//                           ),
-//                         );
-//                       }).toList(),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//               actions: [
-//                 TextButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   child: Text('Hủy thay đổi', style: TextStyle(color: isDarkMode ? Colors.white60 : Colors.grey[600])),
-//                 ),
-//                 ElevatedButton(
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: Colors.blue,
-//                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-//                   ),
-//                   onPressed: () async {
-//                     if (_isTimePast(selectedDate, selectedTime)) {
-//                       ScaffoldMessenger.of(context).showSnackBar(
-//                         const SnackBar(content: Text('Khung giờ được chọn không hợp lệ hoặc đã trôi qua!')),
-//                       );
-//                       return;
-//                     }
-//                     Navigator.pop(context);
-//                     await _saveUpdatedData(sqliteId, firebaseId, dateDisplay, selectedTime, fullAppointment);
-//                   },
-//                   child: const Text('Lưu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-//                 ),
-//               ],
-//             );
-//           },
-//         );
-//       },
-//     );
-//   }
-//   // ================= XỬ LÝ LƯU + TỰ ĐỘNG ĐÔN STT KHÔNG LO MẤT MẠNG (MAX SLOT = 2) =================
-//   Future<void> _saveUpdatedData(dynamic sqliteId, String? firebaseId, String formattedDate, String formattedTime, Map<String, dynamic> fullAppointment) async {
-//     print("============= ĐÃ KÍCH HOẠT HÀM ĐỔI LỊCH THÀNH CÔNG =============");
-//
-//     // Chuẩn hóa ID Firebase tránh lệch key
-//     String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
-//
-//     showDialog(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (context) => const Center(child: CircularProgressIndicator()),
-//     );
-//
-//     try {
-//       String oldDate = safe(fullAppointment, 'date');
-//       String oldTime = safe(fullAppointment, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
-//       String hospital = safe(fullAppointment, 'hospital');
-//       String specialty = safe(fullAppointment, 'specialty');
-//
-//       int oldStt = fullAppointment['stt'] is int
-//           ? fullAppointment['stt']
-//           : int.tryParse(safe(fullAppointment, 'stt')) ?? 0;
-//
-//       // Chuẩn hóa định dạng giờ mới (SA / CH)
-//       String newTimeFormatted = formattedTime.trim().replaceAll(RegExp(r'\s+'), ' ');
-//       if (!newTimeFormatted.contains('SA') && !newTimeFormatted.contains('CH')) {
-//         List<String> parts = newTimeFormatted.split(':');
-//         int hour = int.parse(parts[0]);
-//         newTimeFormatted = (hour >= 12) ? "$newTimeFormatted CH" : "$newTimeFormatted SA";
-//       }
-//       newTimeFormatted = newTimeFormatted.replaceAll(RegExp(r'\s+'), ' ');
-//
-//       // Nếu không thay đổi gì thì đóng loading và thoát
-//       if (oldDate == formattedDate && oldTime == newTimeFormatted) {
-//         Navigator.pop(context);
-//         return;
-//       }
-//
-//       // =========================================================================
-//       // 1. KIỂM TRA SLOT KHUNG GIỜ MỚI CHÍNH XÁC REAL-TIME (KHÔNG ĐÈ NGƯỜI CŨ)
-//       // =========================================================================
-//       final newSlotSnapshot = await FirebaseFirestore.instance
-//           .collection('appointments')
-//           .where('hospital', isEqualTo: hospital)
-//           .where('specialty', isEqualTo: specialty)
-//           .where('date', isEqualTo: formattedDate)
-//           .where('time', isEqualTo: newTimeFormatted)
-//           .get();
-//
-//       // Lọc những người THỰC SỰ đang active ở khung giờ mới (loại trừ chính mình nếu đã tồn tại)
-//       final validAppointmentsInNewSlot = newSlotSnapshot.docs.where((doc) {
-//         if (doc.id == validFbId) return false;
-//         String status = (doc.data()['status'] ?? 'upcoming').toString();
-//         return status == 'upcoming';
-//       }).toList();
-//
-//       int currentNewSlotCount = validAppointmentsInNewSlot.length;
-//       const int maxSlot = 2;
-//
-//       if (currentNewSlotCount >= maxSlot) {
-//         throw Exception("SLOT_FULL");
-//       }
-//
-//       // Bạn chuyển đến sau nên bắt buộc phải xếp sau người ta (Ví dụ: có 1 người thì bạn nhận STT 2)
-//       int newStt = currentNewSlotCount + 1;
-//
-//       // =========================================================================
-//       // 2. CẬP NHẬT ĐỒNG BỘ LÊN FIREBASE
-//       // =========================================================================
-//       if (validFbId != null && validFbId.isNotEmpty) {
-//         // Cập nhật lịch của chính bạn lên Doc ID riêng biệt (Tuyệt đối không ghi đè Doc người khác)
-//         await FirebaseFirestore.instance
-//             .collection('appointments')
-//             .doc(validFbId)
-//             .update({
-//           'date': formattedDate,
-//           'time': newTimeFormatted,
-//           'stt': newStt,
-//         });
-//
-//         // Lấy danh sách hàng đợi ở khung giờ CŨ để đôn những người phía sau lên
-//         final oldSlotSnapshot = await FirebaseFirestore.instance
-//             .collection('appointments')
-//             .where('hospital', isEqualTo: hospital)
-//             .where('specialty', isEqualTo: specialty)
-//             .where('date', isEqualTo: oldDate)
-//             .where('time', isEqualTo: oldTime)
-//             .get();
-//
-//         List<Future<void>> updateQueueFutures = [];
-//         for (var doc in oldSlotSnapshot.docs) {
-//           if (doc.id == validFbId) continue;
-//
-//           String status = (doc.data()['status'] ?? 'upcoming').toString();
-//           if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
-//             continue;
-//           }
-//
-//           int currentStt = doc.data()['stt'] ?? 0;
-//           if (currentStt > oldStt) {
-//             updateQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
-//           }
-//         }
-//
-//         if (updateQueueFutures.isNotEmpty) {
-//           await Future.wait(updateQueueFutures);
-//         }
-//       } else {
-//         print("⚠️ CẢNH BÁO: Không tìm thấy Firebase ID hợp lệ!");
-//       }
-//
-//       // =========================================================================
-//       // 3. CẬP NHẬT TRÊN LOCAL SQLITE ĐỊA PHƯƠNG (CÔ LẬP BẢN GHI TRÁNH ĐÈ LÊN NHAU)
-//       // =========================================================================
-//       final db = await DatabaseHelper.instance.database;
-//
-//       if (sqliteId != null && sqliteId is int) {
-//         // Cập nhật an toàn bằng ID khóa chính duy nhất của SQLite
-//         await DatabaseHelper.instance.updateAppointmentTime(sqliteId, formattedDate, newTimeFormatted, newStt);
-//       } else {
-//         // Nếu không có id số nguyên, dùng chính trường thông tin cực kỳ chi tiết để update, TRÁNH update đại trà bừa bãi
-//         String emailStr = safe(fullAppointment, 'userEmail').isEmpty
-//             ? LoginScreen.loggedInEmail
-//             : safe(fullAppointment, 'userEmail');
-//
-//         await db.update(
-//           'appointments',
-//           {
-//             'date': formattedDate,
-//             'time': newTimeFormatted,
-//             'stt': newStt
-//           },
-//           // Thêm điều kiện hospital và specialty để ép SQLite chỉ chỉnh sửa đúng bản ghi lịch hẹn này của bạn
-//           where: 'userEmail = ? AND date = ? AND time = ? AND hospital = ? AND specialty = ?',
-//           whereArgs: [emailStr, oldDate, oldTime, hospital, specialty],
-//         );
-//       }
-//
-//       // =========================================================================
-//       // 4. ĐÓNG LOADING VÀ LÀM MỚI GIAO DIỆN
-//       // =========================================================================
-//       Navigator.pop(context);
-//       await loadAppointments();
-//
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(backgroundColor: Colors.green, content: Text('Cập nhật lịch khám và đôn dịch số thứ tự thành công!')),
-//       );
-//
-//     } catch (e) {
-//       if (mounted) Navigator.pop(context);
-//       if (e.toString().contains("SLOT_FULL")) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             backgroundColor: Colors.orange,
-//             content: Text('Khung giờ $formattedTime ngày $formattedDate đã đầy. Vui lòng chọn giờ khác!'),
-//           ),
-//         );
-//       } else {
-//         print("Lỗi hệ thống khi dồn STT hàng đợi: $e");
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Lỗi xảy ra trong quá trình đổi lịch và dồn hàng đợi')),
-//         );
-//       }
-//     }
-//   }
 // =========================================================================
   // 🔥 1. HÀM CẬP NHẬT TRẠNG THÁI (ĐÃ TỐI ƯU CHỐNG TREO XOAY VÒNG KHI OFFLINE)
   // =========================================================================
@@ -903,7 +409,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
 
   // =========================================================================
   // 🔥 5. POPUP CHỌN NGÀY VÀ GIỜ MỚI KHI THAY ĐỔI LỊCH KHÁM
-  // =========================================================================
   Future<void> editAppointment(dynamic sqliteId, String? firebaseId, String currentDate, String currentTime, Map<String, dynamic> fullAppointment) async {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     DateTime selectedDate = DateTime.tryParse(currentDate) ?? DateTime.now();
@@ -922,16 +427,26 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
             return AlertDialog(
               backgroundColor: isDarkMode ? const Color(0xff2A2A2A) : Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+
+              // === SỬA TẠI ĐÂY: Thêm Expanded để text tiêu đề tự động co giãn không bị tràn ===
               title: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Icon(Icons.edit_calendar, color: Colors.blue),
                   const SizedBox(width: 8),
-                  Text(
-                    'Thay đổi lịch khám',
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: Text(
+                      'Thay đổi lịch khám',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18, // Đặt cỡ chữ cố định vừa vặn hơn
+                      ),
+                    ),
                   ),
                 ],
               ),
+
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -972,46 +487,53 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                     const SizedBox(height: 18),
                     const Text('2. Chọn khung giờ mới:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availableTimes.map((time) {
-                        bool isSelected = selectedTime == time;
-                        bool isPast = _isTimePast(selectedDate, time);
-                        return InkWell(
-                          onTap: isPast
-                              ? null
-                              : () {
-                            setPopupState(() {
-                              selectedTime = time;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isPast
-                                  ? (isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey[100])
-                                  : (isSelected ? Colors.blue : (isDarkMode ? Colors.white10 : Colors.grey[200])),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
+
+                    // Bọc Wrap vào SizedBox với double.infinity để tối ưu khoảng không gian dàn trải nút bấm
+                    SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.start,
+                        children: availableTimes.map((time) {
+                          bool isSelected = selectedTime == time;
+                          bool isPast = _isTimePast(selectedDate, time);
+                          return InkWell(
+                            onTap: isPast
+                                ? null
+                                : () {
+                              setPopupState(() {
+                                selectedTime = time;
+                              });
+                            },
+                            child: Container(
+                              // padding tối ưu lại một chút phòng khi chữ quá to ở màn hình nhỏ
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
                                 color: isPast
-                                    ? (isDarkMode ? Colors.white12 : Colors.grey[300]!)
-                                    : (isSelected ? Colors.blue : (isDarkMode ? Colors.white24 : Colors.grey[300]!)),
+                                    ? (isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey[100])
+                                    : (isSelected ? Colors.blue : (isDarkMode ? Colors.white10 : Colors.grey[200])),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isPast
+                                      ? (isDarkMode ? Colors.white12 : Colors.grey[300]!)
+                                      : (isSelected ? Colors.blue : (isDarkMode ? Colors.white24 : Colors.grey[300]!)),
+                                ),
+                              ),
+                              child: Text(
+                                time,
+                                style: TextStyle(
+                                  color: isPast
+                                      ? (isDarkMode ? Colors.white30 : Colors.grey[400])
+                                      : (isSelected ? Colors.white : (isDarkMode ? Colors.white70 : Colors.black87)),
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  decoration: isPast ? TextDecoration.lineThrough : TextDecoration.none,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              time,
-                              style: TextStyle(
-                                color: isPast
-                                    ? (isDarkMode ? Colors.white30 : Colors.grey[400])
-                                    : (isSelected ? Colors.white : (isDarkMode ? Colors.white70 : Colors.black87)),
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                decoration: isPast ? TextDecoration.lineThrough : TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ],
                 ),
@@ -1045,375 +567,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       },
     );
   }
-
-  // =========================================================================
-  // 🔥 6. HÀM XỬ LÝ LƯU + TỰ ĐỘNG ĐÔN STT KHÔNG LO MẤT MẠNG (MAX SLOT = 2)
-  // =========================================================================
-  // Future<void> _saveUpdatedData(dynamic sqliteId, String? firebaseId, String formattedDate, String formattedTime, Map<String, dynamic> fullAppointment) async {
-  //   print("============= ĐÃ KÍCH HOẠT HÀM ĐỔI LỊCH THÀNH CÔNG =============");
-  //
-  //   String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
-  //
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: false,
-  //     builder: (context) => const Center(child: CircularProgressIndicator()),
-  //   );
-  //
-  //   try {
-  //     String oldDate = safe(fullAppointment, 'date');
-  //     String oldTime = safe(fullAppointment, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
-  //     String hospital = safe(fullAppointment, 'hospital');
-  //     String specialty = safe(fullAppointment, 'specialty');
-  //
-  //     int oldStt = fullAppointment['stt'] is int
-  //         ? fullAppointment['stt']
-  //         : int.tryParse(safe(fullAppointment, 'stt')) ?? 0;
-  //
-  //     String newTimeFormatted = formattedTime.trim().replaceAll(RegExp(r'\s+'), ' ');
-  //     if (!newTimeFormatted.contains('SA') && !newTimeFormatted.contains('CH')) {
-  //       List<String> parts = newTimeFormatted.split(':');
-  //       int hour = int.parse(parts[0]);
-  //       newTimeFormatted = (hour >= 12) ? "$newTimeFormatted CH" : "$newTimeFormatted SA";
-  //     }
-  //     newTimeFormatted = newTimeFormatted.replaceAll(RegExp(r'\s+'), ' ');
-  //
-  //     if (oldDate == formattedDate && oldTime == newTimeFormatted) {
-  //       Navigator.pop(context);
-  //       return;
-  //     }
-  //
-  //     // =========================================================================
-  //     // LỚP 1: KIỂM TRA SLOT KHUNG GIỜ MỚI (BỌC TIMEOUT 1 GIÂY ĐỂ ĐỌC CACHE KHI OFFLINE)
-  //     // =========================================================================
-  //     final newSlotSnapshot = await FirebaseFirestore.instance
-  //         .collection('appointments')
-  //         .where('hospital', isEqualTo: hospital)
-  //         .where('specialty', isEqualTo: specialty)
-  //         .where('date', isEqualTo: formattedDate)
-  //         .where('time', isEqualTo: newTimeFormatted)
-  //         .get(const GetOptions(source: Source.serverAndCache))
-  //         .timeout(const Duration(seconds: 1), onTimeout: () {
-  //       // Nếu mất mạng, hệ thống tự động nhảy sang đọc từ bộ nhớ Cache của máy
-  //       return FirebaseFirestore.instance
-  //           .collection('appointments')
-  //           .where('hospital', isEqualTo: hospital)
-  //           .where('specialty', isEqualTo: specialty)
-  //           .where('date', isEqualTo: formattedDate)
-  //           .where('time', isEqualTo: newTimeFormatted)
-  //           .get(const GetOptions(source: Source.cache));
-  //     });
-  //
-  //     final validAppointmentsInNewSlot = newSlotSnapshot.docs.where((doc) {
-  //       if (doc.id == validFbId) return false;
-  //       String status = (doc.data()['status'] ?? 'upcoming').toString();
-  //       return status == 'upcoming';
-  //     }).toList();
-  //
-  //     int currentNewSlotCount = validAppointmentsInNewSlot.length;
-  //     const int maxSlot = 2;
-  //
-  //     if (currentNewSlotCount >= maxSlot) {
-  //       throw Exception("SLOT_FULL");
-  //     }
-  //
-  //     int newStt = currentNewSlotCount + 1;
-  //
-  //     // =========================================================================
-  //     // LỚP 2: CẬP NHẬT ĐỒNG BỘ LÊN FIREBASE (CHẠY NGẦM KHÔNG DÙNG AWAIT)
-  //     // =========================================================================
-  //     if (validFbId != null && validFbId.isNotEmpty) {
-  //       // Lưu lịch đổi mới của bạn vào hàng đợi ngầm Firebase
-  //       FirebaseFirestore.instance
-  //           .collection('appointments')
-  //           .doc(validFbId)
-  //           .update({
-  //         'date': formattedDate,
-  //         'time': newTimeFormatted,
-  //         'stt': newStt,
-  //       }).catchError((e) => print("Lỗi đồng bộ đổi lịch ngầm: $e"));
-  //
-  //       // Lấy danh sách lịch cũ để đôn hàng đợi (Bọc timeout chống treo máy)
-  //       try {
-  //         final oldSlotSnapshot = await FirebaseFirestore.instance
-  //             .collection('appointments')
-  //             .where('hospital', isEqualTo: hospital)
-  //             .where('specialty', isEqualTo: specialty)
-  //             .where('date', isEqualTo: oldDate)
-  //             .where('time', isEqualTo: oldTime)
-  //             .get(const GetOptions(source: Source.serverAndCache))
-  //             .timeout(const Duration(seconds: 1), onTimeout: () {
-  //           return FirebaseFirestore.instance
-  //               .collection('appointments')
-  //               .where('hospital', isEqualTo: hospital)
-  //               .where('specialty', isEqualTo: specialty)
-  //               .where('date', isEqualTo: oldDate)
-  //               .where('time', isEqualTo: oldTime)
-  //               .get(const GetOptions(source: Source.cache));
-  //         });
-  //
-  //         List<Future<void>> updateQueueFutures = [];
-  //         for (var doc in oldSlotSnapshot.docs) {
-  //           if (doc.id == validFbId) continue;
-  //
-  //           String status = (doc.data()['status'] ?? 'upcoming').toString();
-  //           if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
-  //             continue;
-  //           }
-  //
-  //           int currentStt = doc.data()['stt'] ?? 0;
-  //           if (currentStt > oldStt) {
-  //             updateQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
-  //           }
-  //         }
-  //
-  //         if (updateQueueFutures.isNotEmpty) {
-  //           await Future.wait(updateQueueFutures);
-  //         }
-  //       } catch (queueErr) {
-  //         print("Bỏ qua lỗi đôn lịch khung giờ cũ khi offline: $queueErr");
-  //       }
-  //     } else {
-  //       print("⚠️ CẢNH BÁO: Không tìm thấy Firebase ID hợp lệ!");
-  //     }
-  //
-  //     // =========================================================================
-  //     // LỚP 3: CẬP NHẬT TRÊN LOCAL SQLITE ĐỊA PHƯƠNG (CHẠY NGAY TỨC THÌ ĐỂ ĐỔI UI)
-  //     // =========================================================================
-  //     final db = await DatabaseHelper.instance.database;
-  //
-  //     if (sqliteId != null && sqliteId is int) {
-  //       await DatabaseHelper.instance.updateAppointmentTime(sqliteId, formattedDate, newTimeFormatted, newStt);
-  //     } else {
-  //       String emailStr = safe(fullAppointment, 'userEmail').isEmpty
-  //           ? LoginScreen.loggedInEmail
-  //           : safe(fullAppointment, 'userEmail');
-  //
-  //       await db.update(
-  //         'appointments',
-  //         {
-  //           'date': formattedDate,
-  //           'time': newTimeFormatted,
-  //           'stt': newStt
-  //         },
-  //         where: 'userEmail = ? AND date = ? AND time = ? AND hospital = ? AND specialty = ?',
-  //         whereArgs: [emailStr, oldDate, oldTime, hospital, specialty],
-  //       );
-  //     }
-  //
-  //     // =========================================================================
-  //     // LỚP 4: ĐÓNG LOADING VÀ LÀM MỚI GIAO DIỆN
-  //     // =========================================================================
-  //     Navigator.pop(context);
-  //     await loadAppointments();
-  //
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(backgroundColor: Colors.green, content: Text('Cập nhật lịch khám và đôn dịch số thứ tự thành công!')),
-  //     );
-  //
-  //   } catch (e) {
-  //     if (mounted) Navigator.pop(context);
-  //     if (e.toString().contains("SLOT_FULL")) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(
-  //           backgroundColor: Colors.orange,
-  //           content: Text('Khung giờ $formattedTime ngày $formattedDate đã đầy. Vui lòng chọn giờ khác!'),
-  //         ),
-  //       );
-  //     } else {
-  //       print("Lỗi hệ thống khi dồn STT hàng đợi: $e");
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Lỗi xảy ra trong quá trình đổi lịch và dồn hàng đợi')),
-  //       );
-  //     }
-  //   }
-  // }
-  // =========================================================================
-// 🔥 HÀM ĐỔI LỊCH: ĐÃ SỬA LẠI ĐỂ KHÓA CHẶT SLOT KHI OFFLINE
-// =========================================================================
-//   Future<void> _saveUpdatedData(dynamic sqliteId, String? firebaseId, String formattedDate, String formattedTime, Map<String, dynamic> fullAppointment) async {
-//     print("============= ĐÃ KÍCH HOẠT HÀM ĐỔI LỊCH THÀNH CÔNG =============");
-//
-//     String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
-//
-//     showDialog(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (context) => const Center(child: CircularProgressIndicator()),
-//     );
-//
-//     try {
-//       String oldDate = safe(fullAppointment, 'date');
-//       String oldTime = safe(fullAppointment, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
-//       String hospital = safe(fullAppointment, 'hospital');
-//       String specialty = safe(fullAppointment, 'specialty');
-//
-//       int oldStt = fullAppointment['stt'] is int
-//           ? fullAppointment['stt']
-//           : int.tryParse(safe(fullAppointment, 'stt')) ?? 0;
-//
-//       String newTimeFormatted = formattedTime.trim().replaceAll(RegExp(r'\s+'), ' ');
-//       if (!newTimeFormatted.contains('SA') && !newTimeFormatted.contains('CH')) {
-//         List<String> parts = newTimeFormatted.split(':');
-//         int hour = int.parse(parts[0]);
-//         newTimeFormatted = (hour >= 12) ? "$newTimeFormatted CH" : "$newTimeFormatted SA";
-//       }
-//       newTimeFormatted = newTimeFormatted.replaceAll(RegExp(r'\s+'), ' ');
-//
-//       if (oldDate == formattedDate && oldTime == newTimeFormatted) {
-//         Navigator.pop(context);
-//         return;
-//       }
-//
-//       // =========================================================================
-//       // 🛠️ SỬA LỚP 1: KIỂM TRA SLOT CHỈ TỪ SERVER, NẾU OFFLINE THÌ BÁO FULL ĐỂ KHÓA CHẶT
-//       // =========================================================================
-//       int currentNewSlotCount = 0;
-//
-//       try {
-//         // Ép buộc Firebase chỉ lấy từ SERVER với timeout 2 giây
-//         final newSlotSnapshot = await FirebaseFirestore.instance
-//             .collection('appointments')
-//             .where('hospital', isEqualTo: hospital)
-//             .where('specialty', isEqualTo: specialty)
-//             .where('date', isEqualTo: formattedDate)
-//             .where('time', isEqualTo: newTimeFormatted)
-//             .get(const GetOptions(source: Source.server)) // 🔥 Chỉ lấy từ SERVER thực tế
-//             .timeout(const Duration(seconds: 2));
-//
-//         final validAppointmentsInNewSlot = newSlotSnapshot.docs.where((doc) {
-//           if (doc.id == validFbId) return false;
-//           String status = (doc.data()['status'] ?? 'upcoming').toString();
-//           return status == 'upcoming';
-//         }).toList();
-//
-//         currentNewSlotCount = validAppointmentsInNewSlot.length;
-//
-//       } catch (netError) {
-//         // Nếu nhảy vào đây nghĩa là máy không có Wifi/4G (Bị Timeout hoặc lỗi mạng)
-//         print("Đang Offline, không thể check slot thời gian thực. Tự động khóa slot.");
-//         // 💥 THỦ THUẬT: Gán giá trị bằng maxSlot để hệ thống hiểu là "ĐÃ FULL" khi không có mạng
-//         currentNewSlotCount = 2;
-//       }
-//
-//       const int maxSlot = 2;
-//
-//       // Nếu mạng báo full HOẶC đang offline (mất kết nối server), thảy ra lỗi SLOT_FULL ngay lập tức
-//       if (currentNewSlotCount >= maxSlot) {
-//         throw Exception("SLOT_FULL");
-//       }
-//
-//       int newStt = currentNewSlotCount + 1;
-//
-//       // =========================================================================
-//       // LỚP 2: CẬP NHẬT ĐỒNG BỘ LÊN FIREBASE (CHẠY NGẦM KHÔNG DÙNG AWAIT)
-//       // =========================================================================
-//       if (validFbId != null && validFbId.isNotEmpty) {
-//         FirebaseFirestore.instance
-//             .collection('appointments')
-//             .doc(validFbId)
-//             .update({
-//           'date': formattedDate,
-//           'time': newTimeFormatted,
-//           'stt': newStt,
-//         }).catchError((e) => print("Lỗi đồng bộ đổi lịch ngầm: $e"));
-//
-//         try {
-//           final oldSlotSnapshot = await FirebaseFirestore.instance
-//               .collection('appointments')
-//               .where('hospital', isEqualTo: hospital)
-//               .where('specialty', isEqualTo: specialty)
-//               .where('date', isEqualTo: oldDate)
-//               .where('time', isEqualTo: oldTime)
-//               .get(const GetOptions(source: Source.serverAndCache))
-//               .timeout(const Duration(seconds: 1), onTimeout: () {
-//             return FirebaseFirestore.instance
-//                 .collection('appointments')
-//                 .where('hospital', isEqualTo: hospital)
-//                 .where('specialty', isEqualTo: specialty)
-//                 .where('date', isEqualTo: oldDate)
-//                 .where('time', isEqualTo: oldTime)
-//                 .get(const GetOptions(source: Source.cache));
-//           });
-//
-//           List<Future<void>> updateQueueFutures = [];
-//           for (var doc in oldSlotSnapshot.docs) {
-//             if (doc.id == validFbId) continue;
-//
-//             String status = (doc.data()['status'] ?? 'upcoming').toString();
-//             if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
-//               continue;
-//             }
-//
-//             int currentStt = doc.data()['stt'] ?? 0;
-//             if (currentStt > oldStt) {
-//               updateQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
-//             }
-//           }
-//
-//           if (updateQueueFutures.isNotEmpty) {
-//             await Future.wait(updateQueueFutures);
-//           }
-//         } catch (queueErr) {
-//           print("Bỏ qua lỗi đôn lịch khung giờ cũ khi offline: $queueErr");
-//         }
-//       } else {
-//         print("⚠️ CẢNH BÁO: Không tìm thấy Firebase ID hợp lệ!");
-//       }
-//
-//       // =========================================================================
-//       // LỚP 3: CẬP NHẬT TRÊN LOCAL SQLITE ĐỊA PHƯƠNG (CHẠY NGAY TỨC THÌ ĐỂ ĐỔI UI)
-//       // =========================================================================
-//       final db = await DatabaseHelper.instance.database;
-//
-//       if (sqliteId != null && sqliteId is int) {
-//         await DatabaseHelper.instance.updateAppointmentTime(sqliteId, formattedDate, newTimeFormatted, newStt);
-//       } else {
-//         String emailStr = safe(fullAppointment, 'userEmail').isEmpty
-//             ? LoginScreen.loggedInEmail
-//             : safe(fullAppointment, 'userEmail');
-//
-//         await db.update(
-//           'appointments',
-//           {
-//             'date': formattedDate,
-//             'time': newTimeFormatted,
-//             'stt': newStt
-//           },
-//           where: 'userEmail = ? AND date = ? AND time = ? AND hospital = ? AND specialty = ?',
-//           whereArgs: [emailStr, oldDate, oldTime, hospital, specialty],
-//         );
-//       }
-//
-//       // =========================================================================
-//       // LỚP 4: ĐÓNG LOADING VÀ LÀM MỚI GIAO DIỆN
-//       // =========================================================================
-//       Navigator.pop(context);
-//       await loadAppointments();
-//
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(backgroundColor: Colors.green, content: Text('Cập nhật lịch khám và đôn dịch số thứ tự thành công!')),
-//       );
-//
-//     } catch (e) {
-//       if (mounted) Navigator.pop(context);
-//       if (e.toString().contains("SLOT_FULL")) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             backgroundColor: Colors.orange,
-//             content: Text('Khung giờ $formattedTime ngày $formattedDate đã đầy hoặc không khả dụng lúc này. Vui lòng chọn giờ khác!'),
-//           ),
-//         );
-//       } else {
-//         print("Lỗi hệ thống khi dồn STT hàng đợi: $e");
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Lỗi xảy ra trong quá trình đổi lịch và dồn hàng đợi')),
-//         );
-//       }
-//     }
-//   }
   // =========================================================================
   // 🔥 HÀM ĐỔI LỊCH: CHỈ CHO ĐỔI KHI ONLINE, OFFLINE CHẶN ĐỨNG BÁO KẾT NỐI INTERNET
   // =========================================================================
@@ -1841,6 +994,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       CircleAvatar(
                         radius: 22,
@@ -1862,9 +1016,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                                 color: isDarkMode ? Colors.white : Colors.black,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            // Gộp Chuyên khoa và Số phòng khám lên một dòng để tiết kiệm không gian diện tích
-                            Row(
+                            const SizedBox(height: 4),
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
                                 Text(
                                   safe(appointment, 'specialty'),
@@ -1873,7 +1029,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                                     color: isDarkMode ? Colors.white54 : Colors.grey,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                   decoration: BoxDecoration(
@@ -1894,12 +1049,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                           ],
                         ),
                       ),
-                      Row(
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          if (status == 'upcoming')
+                          if (status == 'upcoming') ...[
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              margin: const EdgeInsets.only(right: 6),
                               decoration: BoxDecoration(
                                 color: Colors.blue.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(8),
@@ -1914,6 +1070,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 6),
+                          ],
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
@@ -2013,45 +1171,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                     ),
                   ],
                   const SizedBox(height: 14),
-                  // ================= ĐỔI THIẾT KẾ NÚT CHO TỪNG LOẠI TAB VÀ TRẠNG THÁI =================
-                  // if (!isHistoryTab) ...[
-                  //   Row(
-                  //     children: [
-                  //       if (isPastAppointment(dateStr, timeStr))
-                  //         Expanded(
-                  //           child: Container(
-                  //             height: 40,
-                  //             margin: const EdgeInsets.only(right: 8),
-                  //             child: ElevatedButton.icon(
-                  //               style: ElevatedButton.styleFrom(
-                  //                 backgroundColor: Colors.green,
-                  //                 elevation: 0,
-                  //                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  //               ),
-                  //               onPressed: () => _updateAppointmentStatus(sqliteId, firebaseId, 'completed', 'Xác nhận đã hoàn thành ca khám!', appointment),
-                  //               icon: const Icon(Icons.check_circle, color: Colors.white, size: 18),
-                  //               label: const Text('Đã khám xong', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  //             ),
-                  //           ),
-                  //         ),
-                  //       Expanded(
-                  //         child: SizedBox(
-                  //           height: 40,
-                  //           child: ElevatedButton.icon(
-                  //             style: ElevatedButton.styleFrom(
-                  //               elevation: 0,
-                  //               backgroundColor: const Color(0xffF44336),
-                  //               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  //             ),
-                  //             onPressed: () => deleteAppointment(sqliteId, firebaseId, appointment),
-                  //             icon: const Icon(Icons.delete, color: Colors.white, size: 18),
-                  //             label: const Text('Hủy lịch hẹn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  //           ),
-                  //         ),
-                  //       ),
-                  //     ],
-                  //   ),
-                  // ] else ...[
                   // ================= ĐỔI THIẾT KẾ NÚT CHO TỪNG LOẠI TAB VÀ TRẠNG THÁI =================
                   if (!isHistoryTab) ...[
                     Row(
@@ -2160,39 +1279,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-    final upcomingAppointments = appointments.where((item) {
-      String status = safe(item, 'status');
-      if (status.isEmpty) {
-        status = 'upcoming';
-      }
-      return status == 'upcoming';
-    }).toList()
-      ..sort((a, b) {
-        DateTime dateA = getAppointmentDateTime(a);
-        DateTime dateB = getAppointmentDateTime(b);
-        return dateA.compareTo(dateB);
-      });
-
-    final pastAppointments = appointments.where((item) {
-      String status = safe(item, 'status');
-      if (status.isEmpty) {
-        status = 'upcoming';
-      }
-      if (status == 'archived') {
-        return false;
-      }
-      return (
-          status == 'completed' ||
-              status == 'cancelled' ||
-              status == 'expired'
-      );
-    }).toList()
-      ..sort((a, b) {
-        DateTime dateA = getAppointmentDateTime(a);
-        DateTime dateB = getAppointmentDateTime(b);
-        // lịch sử mới nhất lên đầu
-        return dateB.compareTo(dateA);
-      });
+    // Tự động lấy Email người dùng hiện tại từ danh sách appointments sẵn có của bạn
+    String loggedInUserEmail = '';
+    if (appointments.isNotEmpty) {
+      loggedInUserEmail = safe(appointments.first, 'userEmail');
+    }
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xffF5F7FB),
@@ -2201,25 +1292,97 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         title: const Text('Lịch hẹn của tôi', style: TextStyle(fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          tabs: [
-            Tab(text: 'Sắp tới (${upcomingAppointments.length})'),
-            Tab(text: 'Lịch sử (${pastAppointments.length})'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          buildAppointmentList(upcomingAppointments, false, isDarkMode, isLandscape),
-          buildAppointmentList(pastAppointments, true, isDarkMode, isLandscape),
-        ],
+      // Sử dụng StreamBuilder để lắng nghe Firebase cập nhật số thứ tự Real-time
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('appointments')
+            .where('userEmail', isEqualTo: loggedInUserEmail) // Lọc đúng lịch của máy đang bật
+            .snapshots(),
+        builder: (context, snapshot) {
+          // Nếu đang tải dữ liệu từ Firebase lần đầu
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator(color: Colors.blue));
+          }
+
+          // Tự động nạp dữ liệu mới mỗi khi trên Server có biến động nhảy số
+          List<Map<String, dynamic>> realtimeAppointments = [];
+          if (snapshot.hasData) {
+            for (var doc in snapshot.data!.docs) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              data['fbId'] = doc.id; // Giữ nguyên ID để các nút Hủy/Đổi lịch chạy đúng
+              realtimeAppointments.add(data);
+            }
+          } else {
+            // Bọc hờ nếu Firebase trống thì dùng tạm list cũ của bạn
+            realtimeAppointments = appointments;
+          }
+
+          // --- Giữ nguyên 100% logic lọc Sắp tới của bạn ---
+          final upcomingAppointments = realtimeAppointments.where((item) {
+            String status = safe(item, 'status');
+            if (status.isEmpty) {
+              status = 'upcoming';
+            }
+            return status == 'upcoming';
+          }).toList()
+            ..sort((a, b) {
+              DateTime dateA = getAppointmentDateTime(a);
+              DateTime dateB = getAppointmentDateTime(b);
+              return dateA.compareTo(dateB);
+            });
+
+          // --- Giữ nguyên 100% logic lọc Lịch sử của bạn ---
+          final pastAppointments = realtimeAppointments.where((item) {
+            String status = safe(item, 'status');
+            if (status.isEmpty) {
+              status = 'upcoming';
+            }
+            if (status == 'archived') {
+              return false;
+            }
+            return (status == 'completed' || status == 'cancelled' || status == 'expired');
+          }).toList()
+            ..sort((a, b) {
+              DateTime dateA = getAppointmentDateTime(a);
+              DateTime dateB = getAppointmentDateTime(b);
+              return dateB.compareTo(dateA); // lịch sử mới nhất lên đầu
+            });
+
+          // Trả về giao diện Tab chuẩn của bạn kết hợp số lượng nhảy tự động
+          return DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                Container(
+                  color: Colors.blue,
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: Colors.white,
+                    indicatorWeight: 3,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    tabs: [
+                      Tab(text: 'Sắp tới (${upcomingAppointments.length})'),
+                      Tab(text: 'Lịch sử (${pastAppointments.length})'),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Truyền thêm context vào hàm nếu code yêu cầu, hoặc giữ nguyên như cũ
+                      buildAppointmentList(upcomingAppointments, false, isDarkMode, isLandscape),
+                      buildAppointmentList(pastAppointments, true, isDarkMode, isLandscape),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
