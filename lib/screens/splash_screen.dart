@@ -35,7 +35,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ĐÃ THAY ĐỔI: Gọi tệp Lottie chuyển động thay cho Icon tĩnh cũ
             Lottie.asset(
               'assets/animations/splash_loading.json',
               width: 250,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Đã thêm import Firestore ở đây
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/theme_provider.dart';
 import '../database/database_helper.dart';
 import 'login_screen.dart';
@@ -10,14 +10,12 @@ class ProfileScreen extends StatefulWidget {
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
-
 class _ProfileScreenState extends State<ProfileScreen> {
   bool showPassword = false;
   Future<void> changePassword() async {
     final controller = TextEditingController();
     bool hideNewPassword = true;
     bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -29,8 +27,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-
-              // === KHẮC PHỤC LỖI TRÀN: Thêm Expanded cho tiêu đề giống hệt popup trước ===
               title: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -48,7 +44,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-
               content: TextField(
                 style: TextStyle(
                   color: isDark ? Colors.white : Colors.black,
@@ -94,47 +89,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   onPressed: () async {
                     String newPass = controller.text.trim();
-                    if (newPass.length < 6) {
+                    // --- KIỂM TRA ĐÚNG BẰNG 6 KÝ TỰ (BAO GỒM CHỮ VÀ SỐ) ---
+                    RegExp passwordRegExp = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6}$');
+                    if (!passwordRegExp.hasMatch(newPass)) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Mật khẩu tối thiểu 6 kí tự')),
+                        const SnackBar(
+                          backgroundColor: Colors.red,
+                          content: Text('Mật khẩu phải đúng 6 kí tự, bao gồm cả chữ và số!'),
+                        ),
                       );
                       return;
                     }
-
                     // --- BẬT VÒNG XOAY LOADING ---
-                    // Dùng một BuildContext riêng cho loading bằng cách bọc showDialog tiếp theo
                     showDialog(
                       context: context,
                       barrierDismissible: false,
                       builder: (loadingContext) => const Center(child: CircularProgressIndicator()),
                     );
-
                     try {
                       String userEmail = LoginScreen.loggedInEmail.trim().toLowerCase();
-
                       // 1. CẬP NHẬT ĐỒNG BỘ LÊN FIREBASE CLOUD FIRESTORE
                       await FirebaseFirestore.instance
                           .collection('users')
                           .doc(userEmail)
                           .update({'password': newPass});
-
                       // 2. CẬP NHẬT XUỐNG CƠ SỞ DỮ LIỆU LOCAL SQLITE
                       await DatabaseHelper.instance.updateUserPassword(
                         LoginScreen.loggedInEmail,
                         newPass,
                       );
-
                       // Cập nhật biến tạm thời để hiển thị trên UI ngay lập tức
                       setState(() {
                         LoginScreen.loggedInPassword = newPass;
                       });
-
                       if (!mounted) return;
-
                       // --- ĐIỀU CHỈNH POP CHÍNH XÁC ---
                       Navigator.of(context).pop(); // Tắt Dialog Loading trước
                       Navigator.of(context).pop(); // Tắt Dialog nhập mật khẩu sau
-
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           backgroundColor: Colors.green,
@@ -173,17 +164,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           (route) => false,
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ThemeProvider>(context);
     final isDark = provider.themeMode == ThemeMode.dark;
-
-    // --- ĐỊNH NGHĨA LẠI MÀU SẮC CHUẨN ĐỘ TƯƠNG PHẢN ---
     Color titleColor = isDark ? Colors.white : Colors.black;
     Color subtitleColor = isDark ? Colors.white70 : Colors.black87;
     Color cardBgColor = isDark ? const Color(0xff1E1E1E) : Colors.white;
-
     return Scaffold(
       backgroundColor: isDark ? Colors.black : const Color(0xffF5F7FB),
       appBar: AppBar(
@@ -223,7 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600, fontSize: 14),
             ),
             const SizedBox(height: 30),
-
             // EMAIL CARD
             Card(
               color: cardBgColor,
@@ -242,7 +228,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
             // PASSWORD CARD
             Card(
               color: cardBgColor,
@@ -275,7 +260,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
             // CHANGE PASSWORD ACTION CARD
             Card(
               color: cardBgColor,
@@ -295,7 +279,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
             // DARK MODE SWITCH CARD
             Card(
               color: cardBgColor,
@@ -318,7 +301,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 40),
-
             // LOGOUT BUTTON
             SizedBox(
               width: double.infinity,

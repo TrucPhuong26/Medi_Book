@@ -18,12 +18,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
   List<Map<String, dynamic>> appointments = [];
   late TabController _tabController;
   final List<String> availableTimes = [
-    '08:00 SA',
-    '09:00 SA',
-    '10:00 SA',
-    '01:00 CH',
-    '02:00 CH',
-    '03:00 CH',
+    '08:00 SA', '09:00 SA', '10:00 SA',
+    '01:00 CH', '02:00 CH', '03:00 CH',
   ];
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
@@ -126,38 +122,31 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     setState(() {
       appointments = List<Map<String, dynamic>>.from(localData);
     });
-
     try {
       // 2. LẤY DỮ LIỆU TỪ FIREBASE (Sử dụng real-time từ Server để lấy hàng đợi chuẩn xác)
       final snapshot = await FirebaseFirestore.instance
           .collection('appointments')
           .where('userEmail', isEqualTo: LoginScreen.loggedInEmail)
           .get();
-
       final firebaseData = snapshot.docs.map((doc) {
         var data = doc.data();
         data['fbId'] = doc.id; // Đồng bộ key lưu trữ ID Firebase
         return data;
       }).toList();
-
       if (firebaseData.isNotEmpty) {
         setState(() {
           appointments = firebaseData;
         });
-
         // ================= AUTO QUÉT CHUYỂN TRẠNG THÁI HẾT HẠN (QUÁ 24H) =================
         List<Future<void>> expireUpdates = [];
         for (var item in firebaseData) {
           String status = safe(item, 'status');
           if (status.isEmpty) status = 'upcoming';
-
           if (status == 'upcoming') {
             String dateStr = safe(item, 'date');
             String timeStr = safe(item, 'time');
-
             if (isExpired(dateStr, timeStr)) {
               String? fbId = item['fbId'];
-
               if (fbId != null && fbId.isNotEmpty) {
                 // Đưa vào mảng đợi để xử lý đồng bộ, không để chạy ngầm mất kiểm soát
                 expireUpdates.add(FirebaseFirestore.instance
@@ -165,7 +154,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                     .doc(fbId)
                     .update({'status': 'expired'}));
               }
-
               final db = await DatabaseHelper.instance.database;
               expireUpdates.add(db.update(
                 'appointments',
@@ -176,11 +164,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
             }
           }
         }
-
         // Chờ tất cả tiến trình quét hết hạn xong xuôi hoàn toàn
         if (expireUpdates.isNotEmpty) {
           await Future.wait(expireUpdates);
-
           // Cập nhật lại giao diện cục bộ sau khi quét hết hạn hoàn tất
           final updatedLocalData = await DatabaseHelper.instance.getAppointmentsByUser(
             LoginScreen.loggedInEmail,
@@ -195,9 +181,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     }
     await _scheduleAllAppointmentNotifications();
   }
-// =========================================================================
-  // 🔥 1. HÀM CẬP NHẬT TRẠNG THÁI (ĐÃ TỐI ƯU CHỐNG TREO XOAY VÒNG KHI OFFLINE)
-  // =========================================================================
+  // 1. HÀM CẬP NHẬT TRẠNG THÁI (ĐÃ TỐI ƯU CHỐNG TREO XOAY VÒNG KHI OFFLINE)
   Future<void> _updateAppointmentStatus(
       dynamic sqliteId,
       String? firebaseId,
@@ -205,9 +189,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       String successMsg,
       Map<String, dynamic> appointmentItem,
       ) async {
-
     String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? appointmentItem['fbId'] : firebaseId;
-
     try {
       // 1.1 XỬ LÝ TRÊN FIREBASE (BỎ AWAIT CHO LỆNH UPDATE ĐỂ KHÔNG BỊ KHÓA LUỒNG CODE KHI OFFLINE)
       if (validFbId != null && validFbId.isNotEmpty) {
@@ -219,7 +201,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         int myStt = appointmentItem['stt'] is int
             ? appointmentItem['stt']
             : int.tryParse(safe(appointmentItem, 'stt')) ?? 0;
-
         // Cập nhật trạng thái chạy ngầm (Firebase tự đồng bộ lên server khi điện thoại có mạng)
         FirebaseFirestore.instance
             .collection('appointments')
@@ -227,7 +208,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
             .update({'status': newStatus})
             .then((_) => print("Firebase ngầm: Đã cập nhật status sang [$newStatus]"))
             .catchError((e) => print("Firebase ngầm: Lỗi lưu status (Sẽ tự thử lại): $e"));
-
         // CHỈ ĐÔN DỊCH HÀNG ĐỢI KHI HÀM ĐƯỢC GỌI LÀ HỦY LỊCH ('cancelled')
         if (newStatus == 'cancelled') {
           try {
@@ -248,23 +228,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                   .where('time', isEqualTo: time)
                   .get(const GetOptions(source: Source.cache));
             });
-
             List<Future<void>> clearQueueFutures = [];
             for (var doc in queueSnapshot.docs) {
               if (doc.id == validFbId) continue;
-
               String status = (doc.data()['status'] ?? 'upcoming').toString();
               if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
                 continue;
               }
-
               int currentStt = doc.data()['stt'] ?? 0;
               if (currentStt > myStt) {
                 // Không dùng await tại đây để đẩy hết lệnh cập nhật STT mới vào hàng đợi ngầm
                 clearQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
               }
             }
-
             if (clearQueueFutures.isNotEmpty) {
               await Future.wait(clearQueueFutures);
             }
@@ -273,7 +249,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           }
         }
       }
-
       // 1.2 XỬ LÝ ĐỒNG BỘ TRÊN SQLITE LOCAL (Luôn luôn gánh UI lập tức cho người dùng nhìn thấy)
       try {
         final db = await DatabaseHelper.instance.database;
@@ -286,7 +261,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
               ? LoginScreen.loggedInEmail
               : safe(appointmentItem, 'userEmail');
           String hospitalStr = safe(appointmentItem, 'hospital');
-
           await db.update(
             'appointments',
             {'status': newStatus},
@@ -297,10 +271,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       } catch (ex) {
         print("SQLite update lỗi: $ex");
       }
-
       // 1.3 REFRESH LẠI TOÀN BỘ DATA ĐỂ ĐỒNG BỘ LÊN MÀN HÌNH LẬP TỨC
       await loadAppointments();
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -312,10 +284,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       print("Lỗi cập nhật trạng thái: $e");
     }
   }
-
-  // =========================================================================
-  // 🔥 2. XỬ LÝ HỦY LỊCH HẸN (GIAO DIỆN DIALOG)
-  // =========================================================================
+  //  2. XỬ LÝ HỦY LỊCH HẸN (GIAO DIỆN DIALOG)
   Future<void> deleteAppointment(dynamic sqliteId, String? firebaseId, Map<String, dynamic> item) async {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
@@ -340,17 +309,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         );
       },
     );
-
     if (confirm == true) {
       final int notificationId = sqliteId is int ? sqliteId : (firebaseId ?? '').hashCode;
       await flutterLocalNotificationsPlugin.cancel(notificationId);
       await _updateAppointmentStatus(sqliteId, firebaseId, 'cancelled', 'Đã hủy lịch hẹn thành công', item);
     }
   }
-
-  // =========================================================================
-  // 🔥 3. XỬ LÝ ẨN KHỎI LỊCH SỬ (GIAO DIỆN DIALOG)
-  // =========================================================================
+  // 3. XỬ LÝ ẨN KHỎI LỊCH SỬ (GIAO DIỆN DIALOG)
   Future<void> archiveHistoryItem(dynamic sqliteId, String? firebaseId, Map<String, dynamic> item) async {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
@@ -375,15 +340,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         );
       },
     );
-
     if (confirm == true) {
       await _updateAppointmentStatus(sqliteId, firebaseId, 'archived', 'Đã ẩn lịch hẹn khỏi danh sách hiển thị', item);
     }
   }
-
-  // =========================================================================
-  // 🔥 4. HÀM CHECK THỜI GIAN QUÁ HẠN ĐỂ BLOCK NÚT
-  // =========================================================================
+  // 4. HÀM CHECK THỜI GIAN QUÁ HẠN ĐỂ BLOCK NÚT
   bool _isTimePast(DateTime selectedDate, String timeStr) {
     final now = DateTime.now();
     if (selectedDate.year > now.year) return false;
@@ -406,9 +367,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     }
     return false;
   }
-
-  // =========================================================================
-  // 🔥 5. POPUP CHỌN NGÀY VÀ GIỜ MỚI KHI THAY ĐỔI LỊCH KHÁM
+  // 5. POPUP CHỌN NGÀY VÀ GIỜ MỚI KHI THAY ĐỔI LỊCH KHÁM
   Future<void> editAppointment(dynamic sqliteId, String? firebaseId, String currentDate, String currentTime, Map<String, dynamic> fullAppointment) async {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     DateTime selectedDate = DateTime.tryParse(currentDate) ?? DateTime.now();
@@ -427,8 +386,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
             return AlertDialog(
               backgroundColor: isDarkMode ? const Color(0xff2A2A2A) : Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-
-              // === SỬA TẠI ĐÂY: Thêm Expanded để text tiêu đề tự động co giãn không bị tràn ===
               title: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -440,13 +397,12 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                       style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
-                        fontSize: 18, // Đặt cỡ chữ cố định vừa vặn hơn
+                        fontSize: 18,
                       ),
                     ),
                   ),
                 ],
               ),
-
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -487,7 +443,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                     const SizedBox(height: 18),
                     const Text('2. Chọn khung giờ mới:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 8),
-
                     // Bọc Wrap vào SizedBox với double.infinity để tối ưu khoảng không gian dàn trải nút bấm
                     SizedBox(
                       width: double.infinity,
@@ -567,15 +522,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       },
     );
   }
-  // =========================================================================
-  // 🔥 HÀM ĐỔI LỊCH: CHỈ CHO ĐỔI KHI ONLINE, OFFLINE CHẶN ĐỨNG BÁO KẾT NỐI INTERNET
-  // =========================================================================
+  // HÀM ĐỔI LỊCH: CHỈ CHO ĐỔI KHI ONLINE, OFFLINE CHẶN ĐỨNG BÁO KẾT NỐI INTERNET
   Future<void> _saveUpdatedData(dynamic sqliteId, String? firebaseId, String formattedDate, String formattedTime, Map<String, dynamic> fullAppointment) async {
     print("============= ĐÃ KÍCH HOẠT HÀM ĐỔI LỊCH THÀNH CÔNG =============");
-
-    // -------------------------------------------------------------------------
     // BƯỚC 1: KIỂM TRA MẠNG KHẨN CẤP (OFFLINE THÌ KHÔNG CHO ĐỔI LỊCH)
-    // -------------------------------------------------------------------------
     try {
       final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 2));
       if (result.isEmpty || result[0].rawAddress.isEmpty) {
@@ -604,28 +554,21 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       );
       return; // Chặn đứng tại đây, không chạy xuống code cập nhật dữ liệu phía dưới
     }
-
-    // -------------------------------------------------------------------------
     // BƯỚC 2: XỬ LÝ ĐỔI LỊCH (CHỈ CHẠY KHI ĐÃ XÁC NHẬN CÓ MẠNG 100%)
-    // -------------------------------------------------------------------------
     String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
-
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-
     try {
       String oldDate = safe(fullAppointment, 'date');
       String oldTime = safe(fullAppointment, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
       String hospital = safe(fullAppointment, 'hospital');
       String specialty = safe(fullAppointment, 'specialty');
-
       int oldStt = fullAppointment['stt'] is int
           ? fullAppointment['stt']
           : int.tryParse(safe(fullAppointment, 'stt')) ?? 0;
-
       String newTimeFormatted = formattedTime.trim().replaceAll(RegExp(r'\s+'), ' ');
       if (!newTimeFormatted.contains('SA') && !newTimeFormatted.contains('CH')) {
         List<String> parts = newTimeFormatted.split(':');
@@ -633,12 +576,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         newTimeFormatted = (hour >= 12) ? "$newTimeFormatted CH" : "$newTimeFormatted SA";
       }
       newTimeFormatted = newTimeFormatted.replaceAll(RegExp(r'\s+'), ' ');
-
       if (oldDate == formattedDate && oldTime == newTimeFormatted) {
         Navigator.pop(context);
         return;
       }
-
       // Đọc trực tiếp dữ liệu chính xác tuyệt đối từ SERVER đám mây
       final newSlotSnapshot = await FirebaseFirestore.instance
           .collection('appointments')
@@ -653,17 +594,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         String status = (doc.data()['status'] ?? 'upcoming').toString();
         return status == 'upcoming';
       }).toList();
-
       int currentNewSlotCount = validAppointmentsInNewSlot.length;
       const int maxSlot = 2;
-
       // Nếu online check thấy full thật thì báo đầy lịch
       if (currentNewSlotCount >= maxSlot) {
         throw Exception("SLOT_FULL");
       }
-
       int newStt = currentNewSlotCount + 1;
-
       // Đồng bộ trực tiếp lên Firebase (Vì đang có mạng nên cập nhật ngay)
       if (validFbId != null && validFbId.isNotEmpty) {
         await FirebaseFirestore.instance
@@ -674,7 +611,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           'time': newTimeFormatted,
           'stt': newStt,
         });
-
         // Đôn lịch khung giờ cũ
         final oldSlotSnapshot = await FirebaseFirestore.instance
             .collection('appointments')
@@ -687,23 +623,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         List<Future<void>> updateQueueFutures = [];
         for (var doc in oldSlotSnapshot.docs) {
           if (doc.id == validFbId) continue;
-
           String status = (doc.data()['status'] ?? 'upcoming').toString();
           if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
             continue;
           }
-
           int currentStt = doc.data()['stt'] ?? 0;
           if (currentStt > oldStt) {
             updateQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
           }
         }
-
         if (updateQueueFutures.isNotEmpty) {
           await Future.wait(updateQueueFutures);
         }
       }
-
       // Cập nhật SQLite cục bộ dưới máy để đồng bộ giao diện người dùng
       final db = await DatabaseHelper.instance.database;
       if (sqliteId != null && sqliteId is int) {
@@ -724,15 +656,12 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           whereArgs: [emailStr, oldDate, oldTime, hospital, specialty],
         );
       }
-
       Navigator.pop(context); // Tắt màn hình chờ
       await loadAppointments();
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(backgroundColor: Colors.green, content: Text('Cập nhật lịch khám và đôn dịch số thứ tự thành công!')),
       );
-
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (e.toString().contains("SLOT_FULL")) {
@@ -750,7 +679,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       }
     }
   }
-
 // ================= KIỂM TRA ĐIỀU KIỆN ĐƯỢC ĐỔI LỊCH (TRƯỚC 24H) =================
   bool canEdit(String? dateStr, String? timeStr) {
     if (dateStr == null || dateStr.isEmpty) return false;
@@ -773,7 +701,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       return false;
     }
   }
-
 // ================= HẾT HẠN SAU 1 NGÀY =================
   bool isExpired(String? dateStr, String? timeStr) {
     if (dateStr == null || dateStr.isEmpty) return false;
@@ -794,7 +721,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         hour,
         minute,
       );
-
       final expiredTime = appointmentDateTime.add(const Duration(days: 1));
       return DateTime.now().isAfter(expiredTime);
     } catch (e) {
@@ -805,23 +731,16 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
   // ================= ĐÃ QUA GIỜ KHÁM =================
   bool isPastAppointment(String? dateStr, String? timeStr) {
     if (dateStr == null || dateStr.isEmpty) return false;
-
     try {
       String cleanTime = timeStr ?? "00:00";
-
       bool isPM = cleanTime.contains('CH');
-
       cleanTime =
           cleanTime.replaceAll('SA', '').replaceAll('CH', '').trim();
-
       List<String> timeParts = cleanTime.split(':');
-
       int hour = int.parse(timeParts[0]);
       int minute = int.parse(timeParts[1]);
-
       if (isPM && hour < 12) hour += 12;
       if (!isPM && hour == 12) hour = 0;
-
       final appointmentDateTime = DateTime(
         DateTime.parse(dateStr).year,
         DateTime.parse(dateStr).month,
@@ -829,9 +748,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         hour,
         minute,
       );
-
       return DateTime.now().isAfter(appointmentDateTime);
-
     } catch (e) {
       return false;
     }
@@ -846,7 +763,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       default: return 'Đang cập nhật';
     }
   }
-
   Widget buildInfoItem(IconData icon, Color color, String text, bool isDarkMode, {int maxLines = 1}) {
     return Row(
       crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
@@ -864,8 +780,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       ],
     );
   }
-
-  // ================= DANH SÁCH RENDERING PHÂN CHIA TAB CỰC ĐẸP =================
+  // ================= DANH SÁCH RENDERING PHÂN CHIA TAB =================
   Widget buildAppointmentList(List<Map<String, dynamic>> filteredList, bool isHistoryTab, bool isDarkMode, bool isLandscape) {
     if (filteredList.isEmpty) {
       return LayoutBuilder(
@@ -941,7 +856,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         },
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       itemCount: filteredList.length,
@@ -959,7 +873,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         if (patientName.isEmpty) {
           patientName = safe(appointment, 'userEmail');
         }
-        // Setup màu sắc nhãn trạng thái trực quan chuyên nghiệp
         Color statusBgColor = Colors.green.withOpacity(0.1);
         Color statusTextColor = Colors.green;
         String statusLabel = 'Sắp tới';
@@ -1180,7 +1093,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                           Expanded(
                             child: Container(
                               height: 40,
-                              // Bỏ margin phải vì lúc này chỉ có 1 nút duy nhất
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
@@ -1239,29 +1151,21 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       },
     );
   }
-  //them
   DateTime getAppointmentDateTime(Map<String, dynamic> item) {
     try {
       String dateStr = safe(item, 'date');
       String timeStr = safe(item, 'time');
-
       bool isPM = timeStr.contains('CH');
-
       timeStr = timeStr
           .replaceAll('SA', '')
           .replaceAll('CH', '')
           .trim();
-
       List<String> parts = timeStr.split(':');
-
       int hour = int.parse(parts[0]);
       int minute = int.parse(parts[1]);
-
       if (isPM && hour < 12) hour += 12;
       if (!isPM && hour == 12) hour = 0;
-
       DateTime date = DateTime.parse(dateStr);
-
       return DateTime(
         date.year,
         date.month,
@@ -1278,13 +1182,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
     // Tự động lấy Email người dùng hiện tại từ danh sách appointments sẵn có của bạn
     String loggedInUserEmail = '';
     if (appointments.isNotEmpty) {
       loggedInUserEmail = safe(appointments.first, 'userEmail');
     }
-
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xffF5F7FB),
       appBar: AppBar(
@@ -1304,7 +1206,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator(color: Colors.blue));
           }
-
           // Tự động nạp dữ liệu mới mỗi khi trên Server có biến động nhảy số
           List<Map<String, dynamic>> realtimeAppointments = [];
           if (snapshot.hasData) {
@@ -1317,8 +1218,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
             // Bọc hờ nếu Firebase trống thì dùng tạm list cũ của bạn
             realtimeAppointments = appointments;
           }
-
-          // --- Giữ nguyên 100% logic lọc Sắp tới của bạn ---
+          // --- logic lọc Sắp tới ---
           final upcomingAppointments = realtimeAppointments.where((item) {
             String status = safe(item, 'status');
             if (status.isEmpty) {
@@ -1331,8 +1231,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
               DateTime dateB = getAppointmentDateTime(b);
               return dateA.compareTo(dateB);
             });
-
-          // --- Giữ nguyên 100% logic lọc Lịch sử của bạn ---
+          // --- logic lọc Lịch sử ---
           final pastAppointments = realtimeAppointments.where((item) {
             String status = safe(item, 'status');
             if (status.isEmpty) {
@@ -1348,7 +1247,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
               DateTime dateB = getAppointmentDateTime(b);
               return dateB.compareTo(dateA); // lịch sử mới nhất lên đầu
             });
-
           // Trả về giao diện Tab chuẩn của bạn kết hợp số lượng nhảy tự động
           return DefaultTabController(
             length: 2,
@@ -1373,7 +1271,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Truyền thêm context vào hàm nếu code yêu cầu, hoặc giữ nguyên như cũ
                       buildAppointmentList(upcomingAppointments, false, isDarkMode, isLandscape),
                       buildAppointmentList(pastAppointments, true, isDarkMode, isLandscape),
                     ],

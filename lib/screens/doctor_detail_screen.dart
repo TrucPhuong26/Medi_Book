@@ -5,34 +5,27 @@ class DoctorDetailScreen extends StatelessWidget {
   final String name;
   final String specialty;
   final String experience;
-  // final String address;
   final String price;
   final String description;
   final String hospital;
-  final String room; // 1. Bổ sung biến nhận số phòng khám từ HomeScreen
+  final String room;
 
   const DoctorDetailScreen({
     super.key,
     required this.name,
     required this.specialty,
     required this.experience,
-    // required this.address,
     required this.price,
     required this.description,
     required this.hospital,
-    required this.room, // 2. Bắt buộc truyền vào khi gọi màn hình
+    required this.room,
   });
-
   @override
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final List<String> workingTimes = [
-      '08:00 AM',
-      '09:00 AM',
-      '10:00 AM',
-      '01:00 PM',
-      '02:00 PM',
-      '03:00 PM',
+      '08:00 AM', '09:00 AM', '10:00 AM',
+      '01:00 PM', '02:00 PM', '03:00 PM',
     ];
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xffF5F7FB),
@@ -126,11 +119,6 @@ class DoctorDetailScreen extends StatelessWidget {
                   const SizedBox(height: 25),
                   _buildDetailItem(Icons.local_hospital, 'Bệnh viện công tác', hospital, isDarkMode),
                   const SizedBox(height: 15),
-                  // // Đặt số phòng khám ngay dưới tên bệnh viện giúp người dùng dễ theo dõi lộ trình di chuyển
-                  // _buildDetailItem(Icons.door_sliding, 'Phòng khám số', room, isDarkMode),
-                  // const SizedBox(height: 15),
-                  // _buildDetailItem(Icons.location_on, 'Địa chỉ khám', address, isDarkMode),
-                  // const SizedBox(height: 15),
                   _buildDetailItem(Icons.monetization_on, 'Phí dịch vụ', price, isDarkMode),
                   const SizedBox(height: 30),
                   Text(
@@ -212,7 +200,6 @@ class DoctorDetailScreen extends StatelessWidget {
       ),
     );
   }
-
   // Widget phụ trợ cho các nhãn icon ở trên đầu banner
   Widget _buildInfoTag(IconData icon, String text, Color iconColor) {
     return Container(
@@ -231,7 +218,6 @@ class DoctorDetailScreen extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildDetailItem(IconData icon, String title, String content, bool isDarkMode) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

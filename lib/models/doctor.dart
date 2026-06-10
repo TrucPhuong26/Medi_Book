@@ -2,9 +2,9 @@ class Doctor {
   final String name;
   final String specialty;
   final String experience;
-  final String address;     // Thêm địa chỉ
-  final String price;       // Thêm giá
-  final String description; // Thêm mô tả
+  final String address;
+  final String price;
+  final String description;
   final String room;
 
   Doctor({

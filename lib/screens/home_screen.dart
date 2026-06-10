@@ -9,21 +9,18 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends State<HomeScreen> {
   String selectedSpecialty = 'Tất cả';
   String selectedArea = 'Tất cả';
   String selectedHospital = 'Tất cả';
   final searchController = TextEditingController();
   final List<String> areas = ['Tất cả', 'Cần Thơ', 'TP.HCM'];
-
   final List<Map<String, String>> hospitals = [
     {'name': 'BV Đa khoa Trung Ương Cần Thơ', 'area': 'Cần Thơ'},
     {'name': 'BV Hoàn Mỹ Cửu Long', 'area': 'Cần Thơ'},
     {'name': 'BV Chợ Rẫy', 'area': 'TP.HCM'},
     {'name': 'BV Đại học Y Dược', 'area': 'TP.HCM'},
   ];
-
   final List<Map<String, dynamic>> specialties = [
     {'name': 'Tất cả', 'icon': Icons.medical_services},
     {'name': 'Tim mạch', 'icon': Icons.favorite},
@@ -65,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
     {'name': 'BS. Khưu Anh Tú', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Nha khoa', 'experience': '6 năm', 'rating': '4.7', 'price': '190.000đ', 'description': 'Nha khoa.', 'room': 'Phòng 31'},
     {'name': 'BS. Phạm Nhật Nam', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Nha khoa', 'experience': '9 năm', 'rating': '4.8', 'price': '270.000đ', 'description': 'Niềng răng.', 'room': 'Phòng 32'},
   ];
-
   String removeDiacritics(String str) {
     const withDiacritics = 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
     const withoutDiacritics = 'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyydAAAAAAAAAAAAAAAAAEEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD';
@@ -74,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     return str.toLowerCase();
   }
-
   @override
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -112,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return matchSpecialty && matchHospital && matchSearch;
     }).toList();
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -254,7 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        // === ĐÃ ĐIỀU CHỈNH: Tăng tỷ lệ lên 0.68 để thu ngắn chiều dài Card lại giúp bố cục vuông vắn hơn ===
                         childAspectRatio: 0.68,
                       ),
                       itemBuilder: (context, index) {
@@ -294,7 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                             child: Icon(Icons.person, size: 32, color: Colors.blue)
                                         ),
                                         const SizedBox(height: 8),
-
                                         // Tên bác sĩ
                                         Text(
                                             doctor['name'],
@@ -304,14 +296,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: dropdownTextColor)
                                         ),
                                         const SizedBox(height: 4),
-
                                         // Chuyên khoa
                                         Text(
                                             doctor['specialty'],
                                             style: const TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.w500)
                                         ),
                                         const SizedBox(height: 2),
-
                                         // Bệnh viện
                                         Flexible(
                                           child: Text(
@@ -323,22 +313,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 6),
-
-                                        // === THIẾT KẾ MỚI: Gộp Kinh nghiệm & Đánh giá trên cùng một hàng ngang ===
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.center, // Đẩy kinh nghiệm gan nhau rating o giua
                                           children: [
-                                            // Bên trái: Số năm kinh nghiệm (Bọc Expanded/Flexible phòng hờ chữ to)
                                             Flexible(
                                               child: Text(
-                                                  doctor['experience'], // Ví dụ: "10 năm"
+                                                  doctor['experience'],
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)
                                               ),
                                             ),
                               const SizedBox(width: 12),
-                                            // Bên phải: Đánh giá sao (Ví dụ: [icon] 4.9)
                                             Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
@@ -356,7 +342,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 3),
-
                                   // Nút Đặt lịch
                                   SizedBox(
                                     width: double.infinity,
@@ -389,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     )
-
                   ],
                 ),
               ),

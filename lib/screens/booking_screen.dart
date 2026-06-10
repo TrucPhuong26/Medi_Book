@@ -4,7 +4,6 @@ import '../database/database_helper.dart';
 import 'login_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class BookingScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class BookingScreen extends StatefulWidget {
 }
 class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
-
   // ================= CHỌN =================
   String? selectedArea;
   String? selectedHospital;
@@ -32,265 +30,64 @@ class _BookingScreenState extends State<BookingScreen> {
   String? selectedTime;
   List<String> fullTimeslots = [];
   bool isLoadingSlots = false;
-
   // ================= CONTROLLER =================
   final fullNameController = TextEditingController();
   final cccdController = TextEditingController();
   final phoneController = TextEditingController();
   final symptomController = TextEditingController();
   final birthController = TextEditingController();
-
   // ================= DATA =================
   final List<String> areas = ['Cần Thơ', 'TP.HCM'];
   final Map<String, List<String>> hospitalsByArea = {
     'Cần Thơ': ['BV Đa khoa Trung Ương Cần Thơ', 'BV Hoàn Mỹ Cửu Long'],
     'TP.HCM': ['BV Chợ Rẫy', 'BV Đại học Y Dược'],
   };
-  final List<String> specialties = [
-    'Tim mạch',
-    'Da liễu',
-    'Thần kinh',
-    'Nha khoa'
-  ];
+  final List<String> specialties = ['Tim mạch', 'Da liễu', 'Thần kinh', 'Nha khoa'];
   final List<Map<String, dynamic>> doctors = [
-    // TIM MẠCH
-    {
-      'name': 'BS. Nguyễn Văn An',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Tim mạch',
-      'area': 'TP.HCM',
-      'room': 'Phòng 1',
-    },
-    {
-      'name': 'BS. Lê Hoàng Minh',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Tim mạch',
-      'area': 'TP.HCM',
-      'room': 'Phòng 2',
-    },
-    {
-      'name': 'BS. Trần Thị Kim',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Tim mạch',
-      'area': 'TP.HCM',
-      'room': 'Phòng 3',
-    },
-    {
-      'name': 'BS. Phạm Đức Long',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Tim mạch',
-      'area': 'TP.HCM',
-      'room': 'Phòng 4',
-    },
-    {
-      'name': 'BS. Võ Thành Nhân',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Tim mạch',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 5',
-    },
-    {
-      'name': 'BS. Nguyễn Gia Hân',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Tim mạch',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 6',
-    },
-    {
-      'name': 'BS. Lê Văn Phước',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Tim mạch',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 7',
-    },
-    {
-      'name': 'BS. Trần Gia Bảo',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Tim mạch',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 8',
-    },
-    // DA LIỄU
-    {
-      'name': 'BS. Trần Hải Yến',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Da liễu',
-      'area': 'TP.HCM',
-      'room': 'Phòng 9',
-    },
-    {
-      'name': 'BS. Võ Minh Tân',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Da liễu',
-      'area': 'TP.HCM',
-      'room': 'Phòng 10',
-    },
-    {
-      'name': 'BS. Lê Thị Bình',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Da liễu',
-      'area': 'TP.HCM',
-      'room': 'Phòng 11',
-    },
-    {
-      'name': 'BS. Dương Ngọc Hà',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Da liễu',
-      'area': 'TP.HCM',
-      'room': 'Phòng 12',
-    },
-    {
-      'name': 'BS. Hồ Thanh Vy',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Da liễu',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 13',
-    },
-    {
-      'name': 'BS. Lâm Quốc Huy',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Da liễu',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 14',
-    },
-    {
-      'name': 'BS. Hoàng Gia Bảo',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Da liễu',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 15',
-    },
-    {
-      'name': 'BS. Nguyễn Mỹ Linh',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Da liễu',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 16',
-    },
-    // THẦN KINH
-    {
-      'name': 'BS. Michael Trương',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Thần kinh',
-      'area': 'TP.HCM',
-      'room': 'Phòng 17',
-    },
-    {
-      'name': 'BS. Lý Quốc Bảo',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Thần kinh',
-      'area': 'TP.HCM',
-      'room': 'Phòng 18',
-    },
-    {
-      'name': 'BS. Đặng Minh Tâm',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Thần kinh',
-      'area': 'TP.HCM',
-      'room': 'Phòng 19',
-    },
-    {
-      'name': 'BS. Huỳnh Quốc Việt',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Thần kinh',
-      'area': 'TP.HCM',
-      'room': 'Phòng 20',
-    },
-    {
-      'name': 'BS. Trịnh Hoài Nam',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Thần kinh',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 21',
-    },
-    {
-      'name': 'BS. Bùi Khánh Linh',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Thần kinh',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 22',
-    },
-    {
-      'name': 'BS. Võ Minh Quân',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Thần kinh',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 23',
-    },
-    {
-      'name': 'BS. Lý Minh Triết',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Thần kinh',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 24',
-    },
-    // NHA KHOA
-    {
-      'name': 'BS. Trần Anh Khoa',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Nha khoa',
-      'area': 'TP.HCM',
-      'room': 'Phòng 25',
-    },
-    {
-      'name': 'BS. Nguyễn Thành Đạt',
-      'hospital': 'BV Chợ Rẫy',
-      'specialty': 'Nha khoa',
-      'area': 'TP.HCM',
-      'room': 'Phòng 26',
-    },
-    {
-      'name': 'BS. Emily Trịnh',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Nha khoa',
-      'area': 'TP.HCM',
-      'room': 'Phòng 27',
-    },
-    {
-      'name': 'BS. Đỗ Minh Phúc',
-      'hospital': 'BV Đại học Y Dược',
-      'specialty': 'Nha khoa',
-      'area': 'TP.HCM',
-      'room': 'Phòng 28',
-    },
-    {
-      'name': 'BS. Vương Đình Khôi',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Nha khoa',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 29',
-    },
-    {
-      'name': 'BS. Đoàn Thanh Tùng',
-      'hospital': 'BV Hoàn Mỹ Cửu Long',
-      'specialty': 'Nha khoa',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 30',
-    },
-    {
-      'name': 'BS. Khưu Anh Tú',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Nha khoa',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 31',
-    },
-    {
-      'name': 'BS. Phạm Nhật Nam',
-      'hospital': 'BV Đa khoa Trung Ương Cần Thơ',
-      'specialty': 'Nha khoa',
-      'area': 'Cần Thơ',
-      'room': 'Phòng 32',
-    },
+    // ==================== KHU VỰC: TP.HCM ====================
+    // --- BV Chợ Rẫy ---
+    {'name': 'BS. Nguyễn Văn An', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Tim mạch', 'area': 'TP.HCM', 'room': 'Phòng 1'},
+    {'name': 'BS. Lê Hoàng Minh', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Tim mạch', 'area': 'TP.HCM', 'room': 'Phòng 2'},
+    {'name': 'BS. Trần Hải Yến', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Da liễu', 'area': 'TP.HCM', 'room': 'Phòng 9'},
+    {'name': 'BS. Võ Minh Tân', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Da liễu', 'area': 'TP.HCM', 'room': 'Phòng 10'},
+    {'name': 'BS. Michael Trương', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Thần kinh', 'area': 'TP.HCM', 'room': 'Phòng 17'},
+    {'name': 'BS. Lý Quốc Bảo', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Thần kinh', 'area': 'TP.HCM', 'room': 'Phòng 18'},
+    {'name': 'BS. Trần Anh Khoa', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Nha khoa', 'area': 'TP.HCM', 'room': 'Phòng 25'},
+    {'name': 'BS. Nguyễn Thành Đạt', 'hospital': 'BV Chợ Rẫy', 'specialty': 'Nha khoa', 'area': 'TP.HCM', 'room': 'Phòng 26'},
+    // --- BV Đại học Y Dược ---
+    {'name': 'BS. Trần Thị Kim', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Tim mạch', 'area': 'TP.HCM', 'room': 'Phòng 3'},
+    {'name': 'BS. Phạm Đức Long', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Tim mạch', 'area': 'TP.HCM', 'room': 'Phòng 4'},
+    {'name': 'BS. Lê Thị Bình', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Da liễu', 'area': 'TP.HCM', 'room': 'Phòng 11'},
+    {'name': 'BS. Dương Ngọc Hà', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Da liễu', 'area': 'TP.HCM', 'room': 'Phòng 12'},
+    {'name': 'BS. Đặng Minh Tâm', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Thần kinh', 'area': 'TP.HCM', 'room': 'Phòng 19'},
+    {'name': 'BS. Huỳnh Quốc Việt', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Thần kinh', 'area': 'TP.HCM', 'room': 'Phòng 20'},
+    {'name': 'BS. Emily Trịnh', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Nha khoa', 'area': 'TP.HCM', 'room': 'Phòng 27'},
+    {'name': 'BS. Đỗ Minh Phúc', 'hospital': 'BV Đại học Y Dược', 'specialty': 'Nha khoa', 'area': 'TP.HCM', 'room': 'Phòng 28'},
+
+    // ==================== KHU VỰC: CẦN THƠ ====================
+    // --- BV Hoàn Mỹ Cửu Long ---
+    {'name': 'BS. Võ Thành Nhân', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Tim mạch', 'area': 'Cần Thơ', 'room': 'Phòng 5'},
+    {'name': 'BS. Nguyễn Gia Hân', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Tim mạch', 'area': 'Cần Thơ', 'room': 'Phòng 6'},
+    {'name': 'BS. Hồ Thanh Vy', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Da liễu', 'area': 'Cần Thơ', 'room': 'Phòng 13'},
+    {'name': 'BS. Lâm Quốc Huy', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Da liễu', 'area': 'Cần Thơ', 'room': 'Phòng 14'},
+    {'name': 'BS. Trịnh Hoài Nam', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Thần kinh', 'area': 'Cần Thơ', 'room': 'Phòng 21'},
+    {'name': 'BS. Bùi Khánh Linh', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Thần kinh', 'area': 'Cần Thơ', 'room': 'Phòng 22'},
+    {'name': 'BS. Vương Đình Khôi', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Nha khoa', 'area': 'Cần Thơ', 'room': 'Phòng 29'},
+    {'name': 'BS. Đoàn Thanh Tùng', 'hospital': 'BV Hoàn Mỹ Cửu Long', 'specialty': 'Nha khoa', 'area': 'Cần Thơ', 'room': 'Phòng 30'},
+    // --- BV Đa khoa Trung Ương Cần Thơ ---
+    {'name': 'BS. Lê Văn Phước', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Tim mạch', 'area': 'Cần Thơ', 'room': 'Phòng 7'},
+    {'name': 'BS. Trần Gia Bảo', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Tim mạch', 'area': 'Cần Thơ', 'room': 'Phòng 8'},
+    {'name': 'BS. Hoàng Gia Bảo', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Da liễu', 'area': 'Cần Thơ', 'room': 'Phòng 15'},
+    {'name': 'BS. Nguyễn Mỹ Linh', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Da liễu', 'area': 'Cần Thơ', 'room': 'Phòng 16'},
+    {'name': 'BS. Võ Minh Quân', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Thần kinh', 'area': 'Cần Thơ', 'room': 'Phòng 23'},
+    {'name': 'BS. Lý Minh Triết', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Thần kinh', 'area': 'Cần Thơ', 'room': 'Phòng 24'},
+    {'name': 'BS. Khưu Anh Tú', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Nha khoa', 'area': 'Cần Thơ', 'room': 'Phòng 31'},
+    {'name': 'BS. Phạm Nhật Nam', 'hospital': 'BV Đa khoa Trung Ương Cần Thơ', 'specialty': 'Nha khoa', 'area': 'Cần Thơ', 'room': 'Phòng 32'},
   ];
   final List<String> availableTimes = [
-    '08:00 SA',
-    '09:00 SA',
-    '10:00 SA',
-    '01:00 CH',
-    '02:00 CH',
-    '03:00 CH',
+    '08:00 SA', '09:00 SA', '10:00 SA',
+    '01:00 CH', '02:00 CH', '03:00 CH',
   ];
-
   // ================= INIT =================
   @override
   void initState() {
@@ -306,7 +103,6 @@ class _BookingScreenState extends State<BookingScreen> {
       });
     }
   }
-
   // ================= DATE =================
   Future<void> pickDate() async {
     final pickedDate = await showDatePicker(
@@ -324,7 +120,6 @@ class _BookingScreenState extends State<BookingScreen> {
       await fetchFullTimeslots();
     }
   }
-
   Future<void> pickBirthDate() async {
     final pickedDate = await showDatePicker(
       context: context,
@@ -338,9 +133,7 @@ class _BookingScreenState extends State<BookingScreen> {
       '${pickedDate.day}/${pickedDate.month}/${pickedDate.year}';
     }
   }
-
   // ================= ĐỒNG BỘ TOÀN BỘ LOGIC (FIX LỖI CÀI LẠI APP) =================
-
 // ================= CHECK TIME =================
   bool isTimePassed(DateTime date, String timeString) {
     DateTime now = DateTime.now();
@@ -367,19 +160,16 @@ class _BookingScreenState extends State<BookingScreen> {
     }
     return false;
   }
-
+   // ======= FULL TIME SLOT =========
   Future<void> fetchFullTimeslots() async {
     if (selectedHospital == null || selectedSpecialty == null || selectedDate == null) {
       return;
     }
-
     setState(() {
       isLoadingSlots = true;
     });
-
     String dateString = DateFormat('yyyy-MM-dd').format(selectedDate!);
     QuerySnapshot<Map<String, dynamic>> snapshot;
-
     try {
       // 1. CỐ GẮNG ĐỌC TỪ SERVER TRƯỚC (Dành cho lúc có mạng)
       snapshot = await FirebaseFirestore.instance
@@ -389,10 +179,8 @@ class _BookingScreenState extends State<BookingScreen> {
           .where('date', isEqualTo: dateString)
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 2));
-
     } catch (e) {
       print("Mất mạng hoặc timeout, tiến hành đọc từ CACHE máy Ly để xử lý lịch offline: $e");
-
       // 2. KHI OFFLINE (Bị timeout hoặc lỗi mạng): Ép buộc đọc từ Cache cục bộ của máy Ly
       try {
         snapshot = await FirebaseFirestore.instance
@@ -409,18 +197,14 @@ class _BookingScreenState extends State<BookingScreen> {
         return;
       }
     }
-
     // 3. XỬ LÝ ĐẾM SLOT (Áp dụng cho cả dữ liệu Server hoặc dữ liệu Cache offline)
     Map<String, int> slotCounts = {};
-
     for (var doc in snapshot.docs) {
       final data = doc.data();
       String status = data['status'] ?? 'upcoming';
       String time = data['time'] ?? '';
-
       // Kiểm tra xem document này có phải do chính máy Ly vừa bấm Hủy offline hay không
       bool isPending = doc.metadata.hasPendingWrites;
-
       if (time.isNotEmpty) {
         // BẢO VỆ SLOT KHI OFFLINE:
         // - Nếu lịch là 'upcoming' -> Chắc chắn tính slot.
@@ -430,21 +214,19 @@ class _BookingScreenState extends State<BookingScreen> {
         }
       }
     }
-
     List<String> tempFullSlots = [];
     slotCounts.forEach((time, count) {
       if (count >= 2) {
         tempFullSlots.add(time); // Thêm vào danh sách khóa nếu >= 2 slot
       }
     });
-
     if (!mounted) return;
     setState(() {
       fullTimeslots = tempFullSlots; // Cập nhật lại UI, giờ đó sẽ tiếp tục bị khóa đỏ/ẩn đi
       isLoadingSlots = false;
     });
   }
-
+  // ====== STT TIEP THEO ============
   Future<int> getNextSequenceNumber(String hospital, String doctor, String date, String time) async {
     try {
       // Đặt timeout 1 giây. Nếu mất mạng, hệ thống nhảy ngay sang đọc Cache để tính STT, tránh quay vòng vô tận.
@@ -464,7 +246,6 @@ class _BookingScreenState extends State<BookingScreen> {
             .where('time', isEqualTo: time)
             .get(const GetOptions(source: Source.cache));
       });
-
       int validCount = 0;
       for (var doc in query.docs) {
         final data = doc.data();
@@ -479,6 +260,7 @@ class _BookingScreenState extends State<BookingScreen> {
       return 1;
     }
   }
+  // ======= DUPLICATE ON FIREBASE ============
   Future<bool> checkDuplicateOnFirebase(String email, String date, String time) async {
     try {
       String cleanEmail = email.trim().toLowerCase();
@@ -504,12 +286,12 @@ class _BookingScreenState extends State<BookingScreen> {
       return false;
     }
   }
+  // ========= DUPLIACTE ON SQLlITE ==========
   Future<bool> checkDuplicateOnSQLite(String email, String date,
       String time) async {
     return await DatabaseHelper.instance.isAppointmentDuplicate(
         email.trim().toLowerCase(), date, time);
   }
-
 // ================= LẤY PHÒNG KHÁM =================
   String getSelectedDoctorRoom() {
     final doctorData = doctors.firstWhere(
@@ -518,16 +300,11 @@ class _BookingScreenState extends State<BookingScreen> {
     );
     return doctorData['room'] ?? 'Chưa có phòng';
   }
-  // SỬA LẠI HÀM: Chặn đứng khi Offline, tự động đợi mạng Realme thức tỉnh ở lần bấm đầu
+  // Chặn đứng khi Offline, tự động đợi mạng Realme thức tỉnh ở lần bấm đầu
   Future<void> bookAppointment(int sttNum) async {
-    // -------------------------------------------------------------------------
     // BƯỚC KIỂM TRA MẠNG THỰC TẾ (CÓ MẠNG MỚI CHO ĐẶT - KHÔNG MẠNG CHẶN ĐỨNG)
-    // -------------------------------------------------------------------------
     bool hasInternet = false;
-
     try {
-      // Gửi một request HEAD siêu nhẹ tới google để kiểm tra đường truyền thực tế
-      // Đặt timeout 3 giây để máy Realme của mẹ có đủ thời gian mở băng thông ngầm
       final response = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
         hasInternet = true; // Thực sự có internet
@@ -535,7 +312,6 @@ class _BookingScreenState extends State<BookingScreen> {
     } catch (_) {
       hasInternet = false; // Mất mạng hoặc nghẽn mạng deep sleep
     }
-
     // Nếu hoàn toàn không có mạng, chặn đứng và báo lỗi đúng như logic bạn muốn
     if (!hasInternet) {
       if (!mounted) return;
@@ -559,13 +335,8 @@ class _BookingScreenState extends State<BookingScreen> {
       );
       return; // CHẶN ĐỨNG TẠI ĐÂY, không cho chạy xuống code lưu dữ liệu phía dưới
     }
-
-    // -------------------------------------------------------------------------
-    // CODE LƯU DỮ LIỆU CŨ (GIỮ NGUYÊN 100% GỐC CỦA BẠN KHÔNG SỬA MỘT CHỮ)
-    // -------------------------------------------------------------------------
     String dateString = DateFormat('yyyy-MM-dd').format(selectedDate!);
     String cleanEmail = LoginScreen.loggedInEmail.trim().toLowerCase();
-
     try {
       // 1. Lưu SQLite tại thiết bị địa phương trước
       await DatabaseHelper.instance.addAppointment(
@@ -579,7 +350,6 @@ class _BookingScreenState extends State<BookingScreen> {
         symptoms: symptomController.text.trim(),
         stt: sttNum,
       );
-
       // 2. Lưu Firebase tập trung
       FirebaseFirestore.instance.collection('appointments').add({
         'userEmail': cleanEmail,
@@ -605,9 +375,7 @@ class _BookingScreenState extends State<BookingScreen> {
     } catch (e) {
       print("Lỗi lưu DB local: $e");
     }
-
     if (!mounted) return;
-
     // Hiển thị dialog báo thành công kèm theo Số Thứ Tự rõ ràng
     showDialog(
       context: context,
@@ -657,7 +425,6 @@ class _BookingScreenState extends State<BookingScreen> {
     Navigator.pop(context); // Đóng AlertDialog thành công
     Navigator.pop(context); // Quay về màn hình trước đó
   }
-
 // ================= TEXTFIELD =================
   Widget buildTextField({
     required String title,
@@ -715,7 +482,6 @@ class _BookingScreenState extends State<BookingScreen> {
       ],
     );
   }
-
 // ================= UI =================
   @override
   Widget build(BuildContext context) {
@@ -904,7 +670,6 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
                 const SizedBox(height: 30),
               ],
-
               // ================= NGÀY GIỜ KHÁM =================
               const Text('Ngày giờ khám',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -948,7 +713,6 @@ class _BookingScreenState extends State<BookingScreen> {
                 const Center(child: Padding(padding: EdgeInsets.all(10.0),
                     child: CircularProgressIndicator()))
               else
-              // THAY THẾ WIDGET WRAP CŨ BẰNG GRIDVIEW ĐỂ CỐ ĐỊNH 3 CỘT TRÊN MỌI MÀN HÌNH
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -965,7 +729,6 @@ class _BookingScreenState extends State<BookingScreen> {
                     bool isFull = fullTimeslots.contains(time);
                     bool isSelected = selectedTime == time;
                     bool isDisabled = isPassed || isFull;
-
                     return InkWell(
                       onTap: isDisabled
                           ? null
@@ -975,7 +738,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         });
                       },
                       child: Container(
-                        // Dùng Alignment.center thay vì padding cứng để nội dung luôn ở giữa ô Grid
                         alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
@@ -989,7 +751,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          // FittedBox giúp chữ tự động thu nhỏ lại vừa vặn trong ô nếu font chữ máy mẹ bị phóng to
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
@@ -1090,12 +851,12 @@ class _BookingScreenState extends State<BookingScreen> {
                       .isEmpty) return 'Vui lòng nhập tình trạng triệu chứng';
                   if (value
                       .trim()
-                      .length < 5) return 'Vui lòng mô tả rõ hơn một chút';
+                      .length < 3) return 'Vui lòng mô tả rõ hơn một chút';
                   return null;
                 },
               ),
               const SizedBox(height: 20),
-// NUT DAT LICH
+// ========= NUT DAT LICH =================
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -1116,11 +877,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       return;
                     }
                     if (!_formKey.currentState!.validate()) return;
-
-                    // -------------------------------------------------------------------------
-                    // 🌟 BƯỚC 1: KIỂM TRA MẠNG TRƯỚC TIÊN (CHẶN ĐỨNG KHI OFFLINE)
-                    // Thử thách 3 giây để kích hoạt băng thông ngầm Realme của mẹ luôn
-                    // -------------------------------------------------------------------------
+                    // BƯỚC 1: KIỂM TRA MẠNG TRƯỚC TIÊN (CHẶN ĐỨNG KHI OFFLINE)
                     bool hasInternet = false;
                     try {
                       final response = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 3));
@@ -1130,7 +887,6 @@ class _BookingScreenState extends State<BookingScreen> {
                     } catch (_) {
                       hasInternet = false;
                     }
-
                     // Nếu KHÔNG CÓ MẠNG -> Báo lỗi kết nối luôn, bất kể có trùng lịch hay không
                     if (!hasInternet) {
                       if (!context.mounted) return;
@@ -1154,25 +910,19 @@ class _BookingScreenState extends State<BookingScreen> {
                       );
                       return; // Dừng ngay tại đây, không kiểm tra trùng, không làm gì nữa hết!
                     }
-
-                    // -------------------------------------------------------------------------
-                    // 🌟 BƯỚC 2: CÁC LOGIC CŨ (CHỈ CHẠY KHI ĐÃ XÁC NHẬN CÓ MẠNG)
-                    // -------------------------------------------------------------------------
+                    // BƯỚC 2: CÁC LOGIC CŨ (CHỈ CHẠY KHI ĐÃ XÁC NHẬN CÓ MẠNG)
                     String dateString = DateFormat('yyyy-MM-dd').format(selectedDate!);
                     String email = LoginScreen.loggedInEmail;
-
                     // Hiện hiệu ứng chờ xử lý
                     showDialog(
                       context: context,
                       barrierDismissible: false,
                       builder: (context) => const Center(child: CircularProgressIndicator()),
                     );
-
                     try {
                       // 1. KIỂM TRA TRÙNG LỊCH (Lúc này chắc chắn có mạng nên báo trùng lịch là hoàn toàn chính xác)
                       bool isDupLocal = await checkDuplicateOnSQLite(email, dateString, selectedTime!);
                       bool isDupRemote = await checkDuplicateOnFirebase(email, dateString, selectedTime!);
-
                       if (isDupLocal || isDupRemote) {
                         Navigator.pop(context); // Tắt loading lập tức
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1183,10 +933,8 @@ class _BookingScreenState extends State<BookingScreen> {
                         );
                         return;
                       }
-
                       // 2. Lấy STT kế tiếp
                       int nextSTT = await getNextSequenceNumber(selectedHospital!, selectedDoctor!, dateString, selectedTime!);
-
                       // 3. Nếu STT vượt quá giới hạn slot (max = 2)
                       if (nextSTT > 2) {
                         Navigator.pop(context); // Tắt loading
@@ -1199,7 +947,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         fetchFullTimeslots();
                         return;
                       }
-
                       // 4. Tiến hành lưu lịch
                       Navigator.pop(context); // Tắt loading trước khi show hiển thị thành công
                       await bookAppointment(nextSTT);

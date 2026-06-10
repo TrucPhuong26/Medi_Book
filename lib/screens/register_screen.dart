@@ -68,7 +68,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.grey.shade700),
       prefixIcon: Icon(icon, color: Colors.blue),
       filled: true,
-      // Chế độ tối dùng màu xám đen đậm, chế độ sáng dùng xám trắng nhạt
       fillColor: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade100,
       contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
@@ -90,15 +89,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    // Kiểm tra chế độ Dark Mode từ hệ thống
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      // Tự động chuyển nền đen khi qua Dark Mode
       backgroundColor: isDarkMode ? Colors.black : const Color(0xffF4F7FC),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        // Icon quay lại tự động đổi màu Trắng/Đen
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
       ),
       body: SafeArea(
@@ -126,12 +122,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,
-                    // Màu chữ tiêu đề theo chế độ
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
                 const SizedBox(height: 35),
-                /// NAME
+                // NAME
                 TextFormField(
                   controller: nameController,
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
@@ -143,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                /// EMAIL
+                // EMAIL
                 TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -156,7 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                /// PASSWORD
+                // PASSWORD
                 TextFormField(
                   controller: passwordController,
                   obscureText: hidePassword,
