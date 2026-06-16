@@ -10,7 +10,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 1. Khởi tạo Firebase
   await Firebase.initializeApp();
-  // 2. 🔥 CẤU HÌNH FIRESTORE CHẠY OFFLINE KHI MẤT WIFI/4G
+  // 2.CẤU HÌNH FIRESTORE CHẠY OFFLINE KHI MẤT WIFI/4G
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true, // Bật lưu cache offline dưới thiết bị
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED, // Không giới hạn dung lượng bộ nhớ đệm
