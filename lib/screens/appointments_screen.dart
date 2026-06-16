@@ -181,7 +181,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     }
     await _scheduleAllAppointmentNotifications();
   }
-  // 1. HÀM CẬP NHẬT TRẠNG THÁI (ĐÃ TỐI ƯU CHỐNG TREO XOAY VÒNG KHI OFFLINE)
+  // 1. HÀM CẬP NHẬT TRẠNG THÁI (ĐÃ TỐI ƯU: CHỈ ĐÔN STT KHI CÓ MẠNG THÀNH CÔNG)
   Future<void> _updateAppointmentStatus(
       dynamic sqliteId,
       String? firebaseId,
@@ -191,7 +191,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       ) async {
     String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? appointmentItem['fbId'] : firebaseId;
     try {
-      // 1.1 XỬ LÝ TRÊN FIREBASE (BỎ AWAIT CHO LỆNH UPDATE ĐỂ KHÔNG BỊ KHÓA LUỒNG CODE KHI OFFLINE)
+      // 1.1 XỬ LÝ TRÊN FIREBASE
       if (validFbId != null && validFbId.isNotEmpty) {
         String hospital = safe(appointmentItem, 'hospital');
         String specialty = safe(appointmentItem, 'specialty');
@@ -201,55 +201,57 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         int myStt = appointmentItem['stt'] is int
             ? appointmentItem['stt']
             : int.tryParse(safe(appointmentItem, 'stt')) ?? 0;
-        // Cập nhật trạng thái chạy ngầm (Firebase tự đồng bộ lên server khi điện thoại có mạng)
+
+        // Cập nhật trạng thái lịch hẹn của chính mình
         FirebaseFirestore.instance
             .collection('appointments')
             .doc(validFbId)
             .update({'status': newStatus})
-            .then((_) => print("Firebase ngầm: Đã cập nhật status sang [$newStatus]"))
-            .catchError((e) => print("Firebase ngầm: Lỗi lưu status (Sẽ tự thử lại): $e"));
-        // CHỈ ĐÔN DỊCH HÀNG ĐỢI KHI HÀM ĐƯỢC GỌI LÀ HỦY LỊCH ('cancelled')
-        if (newStatus == 'cancelled') {
-          try {
-            // Đặt Timeout 1 giây. Nếu mất mạng, ép buộc chuyển sang đọc dữ liệu từ Cache local ngay để đôn STT
-            final queueSnapshot = await FirebaseFirestore.instance
-                .collection('appointments')
-                .where('hospital', isEqualTo: hospital)
-                .where('specialty', isEqualTo: specialty)
-                .where('date', isEqualTo: date)
-                .where('time', isEqualTo: time)
-                .get(const GetOptions(source: Source.serverAndCache))
-                .timeout(const Duration(seconds: 1), onTimeout: () {
-              return FirebaseFirestore.instance
+            .then((_) async {
+          print("Firebase: Đã cập nhật status sang [$newStatus] thành công trên Server!");
+
+          // CHỈ KHI CẬP NHẬT LÊN SERVER THÀNH CÔNG VÀ LÀ LỆNH HỦY LỊCH THÌ MỚI ĐÔN STT NHAU
+          if (newStatus == 'cancelled') {
+            try {
+              print("Hệ thống có mạng: Bắt đầu tính toán đôn dịch hàng đợi trên Server...");
+              // Lấy danh sách trực tiếp từ Server để đảm bảo tính chính xác
+              final queueSnapshot = await FirebaseFirestore.instance
                   .collection('appointments')
                   .where('hospital', isEqualTo: hospital)
                   .where('specialty', isEqualTo: specialty)
                   .where('date', isEqualTo: date)
                   .where('time', isEqualTo: time)
-                  .get(const GetOptions(source: Source.cache));
-            });
-            List<Future<void>> clearQueueFutures = [];
-            for (var doc in queueSnapshot.docs) {
-              if (doc.id == validFbId) continue;
-              String status = (doc.data()['status'] ?? 'upcoming').toString();
-              if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
-                continue;
+                  .get(const GetOptions(source: Source.server));
+
+              List<Future<void>> clearQueueFutures = [];
+              for (var doc in queueSnapshot.docs) {
+                if (doc.id == validFbId) continue;
+                String status = (doc.data()['status'] ?? 'upcoming').toString();
+                if (status == 'cancelled' || status == 'completed' || status == 'archived' || status == 'expired') {
+                  continue;
+                }
+                int currentStt = doc.data()['stt'] ?? 0;
+                if (currentStt > myStt) {
+                  clearQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
+                }
               }
-              int currentStt = doc.data()['stt'] ?? 0;
-              if (currentStt > myStt) {
-                // Không dùng await tại đây để đẩy hết lệnh cập nhật STT mới vào hàng đợi ngầm
-                clearQueueFutures.add(doc.reference.update({'stt': currentStt - 1}));
+              if (clearQueueFutures.isNotEmpty) {
+                await Future.wait(clearQueueFutures);
+                print("Đã đôn STT của các người dùng phía sau thành công trên Server.");
               }
+            } catch (queueError) {
+              print("Lỗi đôn STT khi chạy trên server: $queueError");
             }
-            if (clearQueueFutures.isNotEmpty) {
-              await Future.wait(clearQueueFutures);
-            }
-          } catch (queueError) {
-            print("Bỏ qua lỗi tính toán đôn dịch hàng đợi Firebase khi offline: $queueError");
           }
-        }
+        })
+            .catchError((e) {
+          // Khi máy offline, lệnh update status ở trên vẫn lọt vào đây hoặc nằm đợi ngầm,
+          // nhưng vì không chạy vào block .then() nên hàng đợi STT của người sau hoàn toàn GIỮ NGUYÊN.
+          print("Firebase ngầm: Đang đợi kết nối mạng để đồng bộ dữ liệu... ($e)");
+        });
       }
-      // 1.2 XỬ LÝ ĐỒNG BỘ TRÊN SQLITE LOCAL (Luôn luôn gánh UI lập tức cho người dùng nhìn thấy)
+
+      // 1.2 XỬ LÝ ĐỒNG BỘ TRÊN SQLITE LOCAL (Luôn luôn ăn ngay lập tức bất kể offline)
       try {
         final db = await DatabaseHelper.instance.database;
         if (sqliteId != null && sqliteId is int) {
@@ -271,7 +273,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       } catch (ex) {
         print("SQLite update lỗi: $ex");
       }
-      // 1.3 REFRESH LẠI TOÀN BỘ DATA ĐỂ ĐỒNG BỘ LÊN MÀN HÌNH LẬP TỨC
+
+      // 1.3 REFRESH LẠI TOÀN BỘ DATA ĐỂ CẬP NHẬT UI TRÊN MÀN HÌNH NGAY LẬP TỨC
       await loadAppointments();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -281,7 +284,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         ),
       );
     } catch (e) {
-      print("Lỗi cập nhật trạng thái: $e");
+      print("Lỗi tổng quát khi cập nhật trạng thái: $e");
     }
   }
   //  2. XỬ LÝ HỦY LỊCH HẸN (GIAO DIỆN DIALOG)
@@ -344,28 +347,58 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       await _updateAppointmentStatus(sqliteId, firebaseId, 'archived', 'Đã ẩn lịch hẹn khỏi danh sách hiển thị', item);
     }
   }
-  // 4. HÀM CHECK THỜI GIAN QUÁ HẠN ĐỂ BLOCK NÚT
-  bool _isTimePast(DateTime selectedDate, String timeStr) {
-    final now = DateTime.now();
-    if (selectedDate.year > now.year) return false;
-    if (selectedDate.year == now.year && selectedDate.month > now.month) return false;
-    if (selectedDate.year == now.year && selectedDate.month == now.month && selectedDate.day > now.day) return false;
-    if (selectedDate.year == now.year && selectedDate.month == now.month && selectedDate.day < now.day) return true;
+  // 1. HÀM PHỤ DÙNG CHUNG (Gom toàn bộ logic phân tích thời gian phức tạp vào đây)
+  DateTime? _parseAppointmentDateTime(dynamic dateInput, String? timeStr) {
+    if (dateInput == null) return null;
     try {
-      String cleanTime = timeStr;
+      // Xử lý Giờ (SA/CH)
+      String cleanTime = timeStr ?? "00:00";
       bool isPM = cleanTime.contains('CH');
       cleanTime = cleanTime.replaceAll('SA', '').replaceAll('CH', '').trim();
-      List<String> parts = cleanTime.split(':');
-      int hour = int.parse(parts[0]);
-      int minute = int.parse(parts[1]);
+
+      List<String> timeParts = cleanTime.split(':');
+      int hour = int.parse(timeParts[0].trim());
+      int minute = int.parse(timeParts[1].trim());
+
       if (isPM && hour < 12) hour += 12;
       if (!isPM && hour == 12) hour = 0;
-      if (hour < now.hour) return true;
-      if (hour == now.hour && minute <= now.minute) return true;
+
+      // Xử lý Ngày (Chấp nhận cả chuỗi String hoặc đối tượng DateTime truyền vào)
+      DateTime parsedDate;
+      if (dateInput is DateTime) {
+        parsedDate = dateInput;
+      } else {
+        String dateStr = dateInput.toString().trim();
+        if (dateStr.contains('/')) {
+          List<String> dateParts = dateStr.split('/');
+          parsedDate = DateTime(int.parse(dateParts[2].trim()), int.parse(dateParts[1].trim()), int.parse(dateParts[0].trim()));
+        } else if (dateStr.contains('-') && dateStr.indexOf('-') == 2) {
+          List<String> dateParts = dateStr.split('-');
+          parsedDate = DateTime(int.parse(dateParts[2].trim()), int.parse(dateParts[1].trim()), int.parse(dateParts[0].trim()));
+        } else {
+          parsedDate = DateTime.parse(dateStr);
+        }
+      }
+
+      return DateTime(parsedDate.year, parsedDate.month, parsedDate.day, hour, minute);
     } catch (e) {
-      print("Lỗi phân tích cú pháp thời gian: $e");
+      print("Lỗi phân tích thời gian: $e");
+      return null;
     }
-    return false;
+  }
+  // 2. HÀM CHECK THỜI GIAN QUÁ HẠN ĐỂ BLOCK NÚT (Sử dụng hàm chung ở trên)
+  bool _isTimePast(DateTime selectedDate, String timeStr) {
+    final appointmentDateTime = _parseAppointmentDateTime(selectedDate, timeStr);
+    if (appointmentDateTime == null) return false;
+
+    return DateTime.now().isAfter(appointmentDateTime);
+  }
+  // 3. HÀM ĐÃ QUA GIỜ KHÁM (Dùng cho chuỗi ngày lấy từ Database)
+  bool isPastAppointment(String? dateStr, String? timeStr) {
+    final appointmentDateTime = _parseAppointmentDateTime(dateStr, timeStr);
+    if (appointmentDateTime == null) return false;
+
+    return DateTime.now().isAfter(appointmentDateTime);
   }
   // 5. POPUP CHỌN NGÀY VÀ GIỜ MỚI KHI THAY ĐỔI LỊCH KHÁM
   Future<void> editAppointment(dynamic sqliteId, String? firebaseId, String currentDate, String currentTime, Map<String, dynamic> fullAppointment) async {
@@ -701,57 +734,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       return false;
     }
   }
-// ================= HẾT HẠN SAU 1 NGÀY =================
+  // 4. HÀM TỰ ĐỘNG HẾT HẠN SAU 1 NGÀY
   bool isExpired(String? dateStr, String? timeStr) {
-    if (dateStr == null || dateStr.isEmpty) return false;
-    try {
-      String cleanTime = timeStr ?? "00:00";
-      bool isPM = cleanTime.contains('CH');
-      cleanTime = cleanTime.replaceAll('SA', '').replaceAll('CH', '').trim();
-      List<String> timeParts = cleanTime.split(':');
-      int hour = int.parse(timeParts[0]);
-      int minute = int.parse(timeParts[1]);
-      if (isPM && hour < 12) hour += 12;
-      if (!isPM && hour == 12) hour = 0;
+    final appointmentDateTime = _parseAppointmentDateTime(dateStr, timeStr);
+    if (appointmentDateTime == null) return false;
 
-      final appointmentDateTime = DateTime(
-        DateTime.parse(dateStr).year,
-        DateTime.parse(dateStr).month,
-        DateTime.parse(dateStr).day,
-        hour,
-        minute,
-      );
-      final expiredTime = appointmentDateTime.add(const Duration(days: 1));
-      return DateTime.now().isAfter(expiredTime);
-    } catch (e) {
-      print("Lỗi isExpired: $e");
-      return false;
-    }
-  }
-  // ================= ĐÃ QUA GIỜ KHÁM =================
-  bool isPastAppointment(String? dateStr, String? timeStr) {
-    if (dateStr == null || dateStr.isEmpty) return false;
-    try {
-      String cleanTime = timeStr ?? "00:00";
-      bool isPM = cleanTime.contains('CH');
-      cleanTime =
-          cleanTime.replaceAll('SA', '').replaceAll('CH', '').trim();
-      List<String> timeParts = cleanTime.split(':');
-      int hour = int.parse(timeParts[0]);
-      int minute = int.parse(timeParts[1]);
-      if (isPM && hour < 12) hour += 12;
-      if (!isPM && hour == 12) hour = 0;
-      final appointmentDateTime = DateTime(
-        DateTime.parse(dateStr).year,
-        DateTime.parse(dateStr).month,
-        DateTime.parse(dateStr).day,
-        hour,
-        minute,
-      );
-      return DateTime.now().isAfter(appointmentDateTime);
-    } catch (e) {
-      return false;
-    }
+    final expiredTime = appointmentDateTime.add(const Duration(days: 1));
+    return DateTime.now().isAfter(expiredTime);
   }
   String getHospitalAddress(String hospital) {
     switch (hospital) {
