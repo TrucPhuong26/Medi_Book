@@ -531,6 +531,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                   onPressed: () => Navigator.pop(context),
                   child: Text('Hủy thay đổi', style: TextStyle(color: isDarkMode ? Colors.white60 : Colors.grey[600])),
                 ),
+
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
@@ -543,11 +544,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
                       );
                       return;
                     }
-                    Navigator.pop(context);
+
+                    // KHÔNG pop Navigator ở đây nữa, hãy để hàm _saveUpdatedData xử lý khi kiểm tra xong!
                     await _saveUpdatedData(sqliteId, firebaseId, dateDisplay, selectedTime, fullAppointment);
                   },
                   child: const Text('Lưu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
+
               ],
             );
           },
@@ -556,17 +559,32 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
     );
   }
   // HÀM ĐỔI LỊCH: CHỈ CHO ĐỔI KHI ONLINE, OFFLINE CHẶN ĐỨNG BÁO KẾT NỐI INTERNET
+
   Future<void> _saveUpdatedData(dynamic sqliteId, String? firebaseId, String formattedDate, String formattedTime, Map<String, dynamic> fullAppointment) async {
     print("============= ĐÃ KÍCH HOẠT HÀM ĐỔI LỊCH THÀNH CÔNG =============");
-    // BƯỚC 1: KIỂM TRA MẠNG KHẨN CẤP (OFFLINE THÌ KHÔNG CHO ĐỔI LỊCH)
+
+    // BƯỚC 1: KIỂM TRA MẠNG KHẨN CẤP (CHÍNH XÁC, KHÔNG BỊ BÁO ẢO)
+    bool isConnected = false;
     try {
-      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 2));
-      if (result.isEmpty || result[0].rawAddress.isEmpty) {
-        throw const SocketException("NO_INTERNET");
+      // Thử phân giải host phổ biến
+      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        isConnected = true;
       }
     } catch (_) {
-      // Nếu không có mạng (hoặc quá 2 giây timeout), dừng hàm và hiện thông báo yêu cầu kết nối ngay
-      if (!mounted) return;
+      // Nếu lỗi DNS, dùng Raw IP để test (Sửa lại cách check IP tĩnh bằng InternetAddress)
+      try {
+        // Sử dụng phương thức kết nối Socket thực tế đến DNS Google thay vì lookup IP chuỗi
+        final socket = await Socket.connect('8.8.8.8', 53, timeout: const Duration(seconds: 2));
+        socket.destroy(); // Đóng socket ngay sau khi test thành công
+        isConnected = true;
+      } catch (__) {
+        isConnected = false;
+      }
+    }
+
+    // Nếu thực sự không có mạng -> Báo lỗi ngay và KHÔNG đóng giao diện chọn lịch
+    if (!isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Colors.orange,
@@ -585,23 +603,31 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           ),
         ),
       );
-      return; // Chặn đứng tại đây, không chạy xuống code cập nhật dữ liệu phía dưới
+      return; // Chặn đứng tại đây, giữ nguyên Dialog chọn lịch cho khách chọn lại hoặc bật mạng
     }
+
     // BƯỚC 2: XỬ LÝ ĐỔI LỊCH (CHỈ CHẠY KHI ĐÃ XÁC NHẬN CÓ MẠNG 100%)
-    String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
+
+    // Bây giờ mới tắt Dialog chọn lịch ban đầu
+    Navigator.pop(context);
+
+    // Hiển thị Loading chờ xử lý trên Server
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
     try {
       String oldDate = safe(fullAppointment, 'date');
       String oldTime = safe(fullAppointment, 'time').trim().replaceAll(RegExp(r'\s+'), ' ');
       String hospital = safe(fullAppointment, 'hospital');
       String specialty = safe(fullAppointment, 'specialty');
+
       int oldStt = fullAppointment['stt'] is int
           ? fullAppointment['stt']
           : int.tryParse(safe(fullAppointment, 'stt')) ?? 0;
+
       String newTimeFormatted = formattedTime.trim().replaceAll(RegExp(r'\s+'), ' ');
       if (!newTimeFormatted.contains('SA') && !newTimeFormatted.contains('CH')) {
         List<String> parts = newTimeFormatted.split(':');
@@ -609,10 +635,12 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
         newTimeFormatted = (hour >= 12) ? "$newTimeFormatted CH" : "$newTimeFormatted SA";
       }
       newTimeFormatted = newTimeFormatted.replaceAll(RegExp(r'\s+'), ' ');
+
       if (oldDate == formattedDate && oldTime == newTimeFormatted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Tắt Loading
         return;
       }
+      String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
       // Đọc trực tiếp dữ liệu chính xác tuyệt đối từ SERVER đám mây
       final newSlotSnapshot = await FirebaseFirestore.instance
           .collection('appointments')
@@ -625,16 +653,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       final validAppointmentsInNewSlot = newSlotSnapshot.docs.where((doc) {
         if (doc.id == validFbId) return false;
         String status = (doc.data()['status'] ?? 'upcoming').toString();
+        bool isPending = doc.metadata.hasPendingWrites;
+        if (isPending && status == 'cancelled') {
+          status = 'upcoming';
+        }
         return status == 'upcoming';
       }).toList();
+
       int currentNewSlotCount = validAppointmentsInNewSlot.length;
       const int maxSlot = 2;
-      // Nếu online check thấy full thật thì báo đầy lịch
+
       if (currentNewSlotCount >= maxSlot) {
         throw Exception("SLOT_FULL");
       }
+
       int newStt = currentNewSlotCount + 1;
-      // Đồng bộ trực tiếp lên Firebase (Vì đang có mạng nên cập nhật ngay)
+      // String? validFbId = (firebaseId == null || firebaseId.isEmpty) ? fullAppointment['fbId'] : firebaseId;
+
       if (validFbId != null && validFbId.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection('appointments')
@@ -644,6 +679,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           'time': newTimeFormatted,
           'stt': newStt,
         });
+
         // Đôn lịch khung giờ cũ
         final oldSlotSnapshot = await FirebaseFirestore.instance
             .collection('appointments')
@@ -669,7 +705,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           await Future.wait(updateQueueFutures);
         }
       }
-      // Cập nhật SQLite cục bộ dưới máy để đồng bộ giao diện người dùng
+
+      // Cập nhật SQLite cục bộ
       final db = await DatabaseHelper.instance.database;
       if (sqliteId != null && sqliteId is int) {
         await DatabaseHelper.instance.updateAppointmentTime(sqliteId, formattedDate, newTimeFormatted, newStt);
@@ -689,14 +726,15 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
           whereArgs: [emailStr, oldDate, oldTime, hospital, specialty],
         );
       }
-      Navigator.pop(context); // Tắt màn hình chờ
+
+      Navigator.pop(context); // Tắt màn hình Loading
       await loadAppointments();
-      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(backgroundColor: Colors.green, content: Text('Cập nhật lịch khám và đôn dịch số thứ tự thành công!')),
       );
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Tắt màn hình Loading nếu lỗi
       if (e.toString().contains("SLOT_FULL")) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -712,6 +750,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> with SingleTick
       }
     }
   }
+
 // ================= KIỂM TRA ĐIỀU KIỆN ĐƯỢC ĐỔI LỊCH (TRƯỚC 24H) =================
   bool canEdit(String? dateStr, String? timeStr) {
     if (dateStr == null || dateStr.isEmpty) return false;
